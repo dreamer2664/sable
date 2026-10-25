@@ -1,0 +1,6 @@
+sable
+sable.exe
+*.o
+*.bundle
+*.exe
+__pycache__/

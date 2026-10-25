@@ -1,0 +1,165 @@
+{
+  "games": 12,
+  "sable_wins": 9,
+  "draws": 1,
+  "losses": 2,
+  "score": 0.7917,
+  "elo_vs_opponent": 231.9,
+  "elo_95ci": [
+    58.5,
+    2400.0
+  ],
+  "sable_movetime_ms": 100,
+  "stockfish": {
+    "opts": {
+      "Skill Level": 2
+    },
+    "limit": "Limit(time=0.1)",
+    "path": "/home/user/sable/tools/../../bin/sf"
+  },
+  "adjudicated_games": 0,
+  "illegal_games": 0,
+  "wall_clock_s": 75.8,
+  "games_detail": [
+    {
+      "result": "1-0",
+      "why": "CHECKMATE",
+      "plies": 67,
+      "sable_win": true,
+      "game": 1,
+      "opening": [],
+      "sable_white": true
+    },
+    {
+      "result": "0-1",
+      "why": "CHECKMATE",
+      "plies": 80,
+      "sable_win": true,
+      "game": 2,
+      "opening": [
+        "e2e4",
+        "e7e5"
+      ],
+      "sable_white": false
+    },
+    {
+      "result": "1-0",
+      "why": "CHECKMATE",
+      "plies": 67,
+      "sable_win": true,
+      "game": 3,
+      "opening": [
+        "e2e4",
+        "c7c5"
+      ],
+      "sable_white": true
+    },
+    {
+      "result": "0-1",
+      "why": "CHECKMATE",
+      "plies": 52,
+      "sable_win": true,
+      "game": 4,
+      "opening": [
+        "d2d4",
+        "d7d5"
+      ],
+      "sable_white": false
+    },
+    {
+      "result": "1-0",
+      "why": "CHECKMATE",
+      "plies": 71,
+      "sable_win": true,
+      "game": 5,
+      "opening": [
+        "d2d4",
+        "g8f6"
+      ],
+      "sable_white": true
+    },
+    {
+      "result": "1/2-1/2",
+      "why": "THREEFOLD_REPETITION",
+      "plies": 120,
+      "game": 6,
+      "opening": [
+        "c2c4",
+        "e7e5"
+      ],
+      "sable_white": false
+    },
+    {
+      "result": "1-0",
+      "why": "CHECKMATE",
+      "plies": 73,
+      "sable_win": true,
+      "game": 7,
+      "opening": [
+        "g1f3",
+        "d7d5"
+      ],
+      "sable_white": true
+    },
+    {
+      "result": "0-1",
+      "why": "CHECKMATE",
+      "plies": 62,
+      "sable_win": true,
+      "game": 8,
+      "opening": [
+        "e2e4",
+        "e7e6"
+      ],
+      "sable_white": false
+    },
+    {
+      "result": "1-0",
+      "why": "CHECKMATE",
+      "plies": 55,
+      "sable_win": true,
+      "game": 9,
+      "opening": [
+        "e2e4",
+        "c7c6"
+      ],
+      "sable_white": true
+    },
+    {
+      "result": "0-1",
+      "why": "CHECKMATE",
+      "plies": 60,
+      "sable_win": true,
+      "game": 10,
+      "opening": [
+        "d2d4",
+        "g7g6"
+      ],
+      "sable_white": false
+    },
+    {
+      "result": "0-1",
+      "why": "CHECKMATE",
+      "plies": 76,
+      "sable_win": false,
+      "game": 11,
+      "opening": [
+        "g1f3",
+        "g8f6"
+      ],
+      "sable_white": true
+    },
+    {
+      "result": "1-0",
+      "why": "CHECKMATE",
+      "plies": 107,
+      "sable_win": false,
+      "game": 12,
+      "opening": [
+        "c2c4",
+        "c7c5"
+      ],
+      "sable_white": false
+    }
+  ]
+}
