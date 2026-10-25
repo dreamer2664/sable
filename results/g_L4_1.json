@@ -1,0 +1,1004 @@
+[
+  {
+    "event": "board_found",
+    "geo": [
+      607,
+      173,
+      1309,
+      876
+    ],
+    "t": 1.91
+  },
+  {
+    "event": "templates_cached",
+    "path": "/home/user/sable/tools/../results/templates.npz",
+    "t": 1.92
+  },
+  {
+    "event": "start_verified",
+    "flipped": false,
+    "t": 1.97
+  },
+  {
+    "event": "my_move",
+    "move": "c2c4",
+    "from_px": [
+      827,
+      745
+    ],
+    "to_px": [
+      827,
+      569
+    ],
+    "think_ms": 250,
+    "t": 3.47
+  },
+  {
+    "event": "opponent_move",
+    "move": "e7e5",
+    "plies": 2,
+    "t": 5.94
+  },
+  {
+    "event": "my_move",
+    "move": "d1b3",
+    "from_px": [
+      915,
+      833
+    ],
+    "to_px": [
+      739,
+      657
+    ],
+    "think_ms": 250,
+    "t": 7.53
+  },
+  {
+    "event": "opponent_move",
+    "move": "g8f6",
+    "plies": 4,
+    "t": 9.31
+  },
+  {
+    "event": "my_move",
+    "move": "b3e3",
+    "from_px": [
+      739,
+      657
+    ],
+    "to_px": [
+      1002,
+      657
+    ],
+    "think_ms": 250,
+    "t": 10.96
+  },
+  {
+    "event": "opponent_move",
+    "move": "f6g4",
+    "plies": 6,
+    "t": 12.07
+  },
+  {
+    "event": "my_move",
+    "move": "e3g3",
+    "from_px": [
+      1002,
+      657
+    ],
+    "to_px": [
+      1178,
+      657
+    ],
+    "think_ms": 250,
+    "t": 13.64
+  },
+  {
+    "event": "opponent_move",
+    "move": "d7d5",
+    "plies": 8,
+    "t": 15.88
+  },
+  {
+    "event": "my_move",
+    "move": "h2h3",
+    "from_px": [
+      1266,
+      745
+    ],
+    "to_px": [
+      1266,
+      657
+    ],
+    "think_ms": 250,
+    "t": 17.5
+  },
+  {
+    "event": "opponent_move",
+    "move": "g4f6",
+    "plies": 10,
+    "t": 18.56
+  },
+  {
+    "event": "my_move",
+    "move": "g3e5",
+    "from_px": [
+      1178,
+      657
+    ],
+    "to_px": [
+      1002,
+      481
+    ],
+    "think_ms": 250,
+    "t": 20.3
+  },
+  {
+    "event": "opponent_move",
+    "move": "d8e7",
+    "plies": 12,
+    "t": 22.51
+  },
+  {
+    "event": "my_move",
+    "move": "e5c3",
+    "from_px": [
+      1002,
+      481
+    ],
+    "to_px": [
+      827,
+      657
+    ],
+    "think_ms": 250,
+    "t": 24.23
+  },
+  {
+    "event": "opponent_move",
+    "move": "a7a6",
+    "plies": 14,
+    "t": 27.64
+  },
+  {
+    "event": "my_move",
+    "move": "b1a3",
+    "from_px": [
+      739,
+      833
+    ],
+    "to_px": [
+      651,
+      657
+    ],
+    "think_ms": 250,
+    "t": 29.15
+  },
+  {
+    "event": "opponent_move",
+    "move": "h7h6",
+    "plies": 16,
+    "t": 32.43
+  },
+  {
+    "event": "my_move",
+    "move": "c4d5",
+    "from_px": [
+      827,
+      569
+    ],
+    "to_px": [
+      915,
+      481
+    ],
+    "think_ms": 250,
+    "t": 34.0
+  },
+  {
+    "event": "opponent_move",
+    "move": "f6d5",
+    "plies": 18,
+    "t": 35.19
+  },
+  {
+    "event": "my_move",
+    "move": "c3d3",
+    "from_px": [
+      827,
+      657
+    ],
+    "to_px": [
+      915,
+      657
+    ],
+    "think_ms": 250,
+    "t": 37.51
+  },
+  {
+    "event": "opponent_move",
+    "move": "d5f4",
+    "plies": 20,
+    "t": 40.3
+  },
+  {
+    "event": "my_move",
+    "move": "d3g3",
+    "from_px": [
+      915,
+      657
+    ],
+    "to_px": [
+      1178,
+      657
+    ],
+    "think_ms": 250,
+    "t": 42.05
+  },
+  {
+    "event": "opponent_move",
+    "move": "f4h5",
+    "plies": 22,
+    "t": 44.76
+  },
+  {
+    "event": "my_move",
+    "move": "g3c3",
+    "from_px": [
+      1178,
+      657
+    ],
+    "to_px": [
+      827,
+      657
+    ],
+    "think_ms": 250,
+    "t": 46.8
+  },
+  {
+    "event": "opponent_move",
+    "move": "b8c6",
+    "plies": 24,
+    "t": 49.02
+  },
+  {
+    "event": "my_move",
+    "move": "g2g4",
+    "from_px": [
+      1178,
+      745
+    ],
+    "to_px": [
+      1178,
+      569
+    ],
+    "think_ms": 250,
+    "t": 50.78
+  },
+  {
+    "event": "opponent_move",
+    "move": "e7e4",
+    "plies": 26,
+    "t": 54.18
+  },
+  {
+    "event": "my_move",
+    "move": "f2f3",
+    "from_px": [
+      1090,
+      745
+    ],
+    "to_px": [
+      1090,
+      657
+    ],
+    "think_ms": 250,
+    "t": 55.83
+  },
+  {
+    "event": "opponent_move",
+    "move": "e4f4",
+    "plies": 28,
+    "t": 58.09
+  },
+  {
+    "event": "my_move",
+    "move": "g4h5",
+    "from_px": [
+      1178,
+      569
+    ],
+    "to_px": [
+      1266,
+      481
+    ],
+    "think_ms": 250,
+    "t": 59.82
+  },
+  {
+    "event": "opponent_move",
+    "move": "f8e7",
+    "plies": 30,
+    "t": 63.05
+  },
+  {
+    "event": "my_move",
+    "move": "c3g7",
+    "from_px": [
+      827,
+      657
+    ],
+    "to_px": [
+      1178,
+      305
+    ],
+    "think_ms": 250,
+    "t": 64.59
+  },
+  {
+    "event": "opponent_move",
+    "move": "f4h4",
+    "plies": 32,
+    "t": 66.89
+  },
+  {
+    "event": "my_move",
+    "move": "e1d1",
+    "from_px": [
+      1002,
+      833
+    ],
+    "to_px": [
+      915,
+      833
+    ],
+    "think_ms": 250,
+    "t": 68.47
+  },
+  {
+    "event": "opponent_move",
+    "move": "e7f6",
+    "plies": 34,
+    "t": 71.13
+  },
+  {
+    "event": "my_move",
+    "move": "g7g2",
+    "from_px": [
+      1178,
+      305
+    ],
+    "to_px": [
+      1178,
+      745
+    ],
+    "think_ms": 250,
+    "t": 72.78
+  },
+  {
+    "event": "opponent_move",
+    "move": "c6b4",
+    "plies": 36,
+    "t": 75.07
+  },
+  {
+    "event": "my_move",
+    "move": "g2h2",
+    "from_px": [
+      1178,
+      745
+    ],
+    "to_px": [
+      1266,
+      745
+    ],
+    "think_ms": 250,
+    "t": 76.7
+  },
+  {
+    "event": "opponent_move",
+    "move": "b4c6",
+    "plies": 38,
+    "t": 77.88
+  },
+  {
+    "event": "my_move",
+    "move": "e2e3",
+    "from_px": [
+      1002,
+      745
+    ],
+    "to_px": [
+      1002,
+      657
+    ],
+    "think_ms": 250,
+    "t": 79.65
+  },
+  {
+    "event": "opponent_move",
+    "move": "h8g8",
+    "plies": 40,
+    "t": 83.01
+  },
+  {
+    "event": "my_move",
+    "move": "f1e2",
+    "from_px": [
+      1090,
+      833
+    ],
+    "to_px": [
+      1002,
+      745
+    ],
+    "think_ms": 250,
+    "t": 84.65
+  },
+  {
+    "event": "opponent_move",
+    "move": "g8g3",
+    "plies": 42,
+    "t": 86.86
+  },
+  {
+    "event": "my_move",
+    "move": "e2f1",
+    "from_px": [
+      1002,
+      745
+    ],
+    "to_px": [
+      1090,
+      833
+    ],
+    "think_ms": 250,
+    "t": 88.84
+  },
+  {
+    "event": "opponent_move",
+    "move": "f6e5",
+    "plies": 44,
+    "t": 91.08
+  },
+  {
+    "event": "my_move",
+    "move": "f3f4",
+    "from_px": [
+      1090,
+      657
+    ],
+    "to_px": [
+      1090,
+      569
+    ],
+    "think_ms": 250,
+    "t": 92.72
+  },
+  {
+    "event": "opponent_move",
+    "move": "e5d6",
+    "plies": 46,
+    "t": 95.54
+  },
+  {
+    "event": "my_move",
+    "move": "a3c4",
+    "from_px": [
+      651,
+      657
+    ],
+    "to_px": [
+      827,
+      569
+    ],
+    "think_ms": 250,
+    "t": 97.14
+  },
+  {
+    "event": "opponent_move",
+    "move": "c8f5",
+    "plies": 48,
+    "t": 98.91
+  },
+  {
+    "event": "my_move",
+    "move": "c4d6",
+    "from_px": [
+      827,
+      569
+    ],
+    "to_px": [
+      915,
+      393
+    ],
+    "think_ms": 250,
+    "t": 100.55
+  },
+  {
+    "event": "opponent_move",
+    "move": "c7d6",
+    "plies": 50,
+    "t": 102.76
+  },
+  {
+    "event": "my_move",
+    "move": "g1e2",
+    "from_px": [
+      1178,
+      833
+    ],
+    "to_px": [
+      1002,
+      745
+    ],
+    "think_ms": 250,
+    "t": 104.32
+  },
+  {
+    "event": "opponent_move",
+    "move": "g3g8",
+    "plies": 52,
+    "t": 106.53
+  },
+  {
+    "event": "my_move",
+    "move": "h1g1",
+    "from_px": [
+      1266,
+      833
+    ],
+    "to_px": [
+      1178,
+      833
+    ],
+    "think_ms": 250,
+    "t": 108.28
+  },
+  {
+    "event": "opponent_move",
+    "move": "f5g4",
+    "plies": 54,
+    "t": 109.48
+  },
+  {
+    "event": "my_move",
+    "move": "g1g2",
+    "from_px": [
+      1178,
+      833
+    ],
+    "to_px": [
+      1178,
+      745
+    ],
+    "think_ms": 250,
+    "t": 111.37
+  },
+  {
+    "event": "opponent_move",
+    "move": "g4e2",
+    "plies": 56,
+    "t": 113.58
+  },
+  {
+    "event": "my_move",
+    "move": "f1e2",
+    "from_px": [
+      1090,
+      833
+    ],
+    "to_px": [
+      1002,
+      745
+    ],
+    "think_ms": 250,
+    "t": 115.17
+  },
+  {
+    "event": "opponent_move",
+    "move": "e8d7",
+    "plies": 58,
+    "t": 116.3
+  },
+  {
+    "event": "my_move",
+    "move": "a1b1",
+    "from_px": [
+      651,
+      833
+    ],
+    "to_px": [
+      739,
+      833
+    ],
+    "think_ms": 250,
+    "t": 117.96
+  },
+  {
+    "event": "opponent_move",
+    "move": "a6a5",
+    "plies": 60,
+    "t": 119.06
+  },
+  {
+    "event": "my_move",
+    "move": "b2b3",
+    "from_px": [
+      739,
+      745
+    ],
+    "to_px": [
+      739,
+      657
+    ],
+    "think_ms": 250,
+    "t": 120.63
+  },
+  {
+    "event": "opponent_move",
+    "move": "d7e7",
+    "plies": 62,
+    "t": 121.76
+  },
+  {
+    "event": "my_move",
+    "move": "c1b2",
+    "from_px": [
+      827,
+      833
+    ],
+    "to_px": [
+      739,
+      745
+    ],
+    "think_ms": 250,
+    "t": 123.33
+  },
+  {
+    "event": "opponent_move",
+    "move": "b7b5",
+    "plies": 64,
+    "t": 125.53
+  },
+  {
+    "event": "my_move",
+    "move": "b2g7",
+    "from_px": [
+      739,
+      745
+    ],
+    "to_px": [
+      1178,
+      305
+    ],
+    "think_ms": 250,
+    "t": 127.33
+  },
+  {
+    "event": "opponent_move",
+    "move": "b5b4",
+    "plies": 66,
+    "t": 130.07
+  },
+  {
+    "event": "my_move",
+    "move": "g7h6",
+    "from_px": [
+      1178,
+      305
+    ],
+    "to_px": [
+      1266,
+      393
+    ],
+    "think_ms": 250,
+    "t": 131.76
+  },
+  {
+    "event": "opponent_move",
+    "move": "h4f6",
+    "plies": 68,
+    "t": 132.91
+  },
+  {
+    "event": "my_move",
+    "move": "h6g5",
+    "from_px": [
+      1266,
+      393
+    ],
+    "to_px": [
+      1178,
+      481
+    ],
+    "think_ms": 250,
+    "t": 134.58
+  },
+  {
+    "event": "opponent_move",
+    "move": "a8c8",
+    "plies": 70,
+    "t": 135.69
+  },
+  {
+    "event": "my_move",
+    "move": "g5f6",
+    "from_px": [
+      1178,
+      481
+    ],
+    "to_px": [
+      1090,
+      393
+    ],
+    "think_ms": 250,
+    "t": 137.53
+  },
+  {
+    "event": "opponent_move",
+    "move": "e7f6",
+    "plies": 72,
+    "t": 139.71
+  },
+  {
+    "event": "my_move",
+    "move": "e2a6",
+    "from_px": [
+      1002,
+      745
+    ],
+    "to_px": [
+      651,
+      393
+    ],
+    "think_ms": 250,
+    "t": 141.46
+  },
+  {
+    "event": "opponent_move",
+    "move": "c6e7",
+    "plies": 74,
+    "t": 143.79
+  },
+  {
+    "event": "my_move",
+    "move": "a6c8",
+    "from_px": [
+      651,
+      393
+    ],
+    "to_px": [
+      827,
+      217
+    ],
+    "think_ms": 250,
+    "t": 145.4
+  },
+  {
+    "event": "opponent_move",
+    "move": "g8c8",
+    "plies": 76,
+    "t": 146.58
+  },
+  {
+    "event": "my_move",
+    "move": "g2g5",
+    "from_px": [
+      1178,
+      745
+    ],
+    "to_px": [
+      1178,
+      481
+    ],
+    "think_ms": 250,
+    "t": 148.28
+  },
+  {
+    "event": "opponent_move",
+    "move": "d6d5",
+    "plies": 78,
+    "t": 150.46
+  },
+  {
+    "event": "my_move",
+    "move": "h2e2",
+    "from_px": [
+      1266,
+      745
+    ],
+    "to_px": [
+      1002,
+      745
+    ],
+    "think_ms": 250,
+    "t": 152.03
+  },
+  {
+    "event": "opponent_move",
+    "move": "c8c6",
+    "plies": 80,
+    "t": 153.22
+  },
+  {
+    "event": "my_move",
+    "move": "h5h6",
+    "from_px": [
+      1266,
+      481
+    ],
+    "to_px": [
+      1266,
+      393
+    ],
+    "think_ms": 250,
+    "t": 154.98
+  },
+  {
+    "event": "opponent_move",
+    "move": "c6c7",
+    "plies": 82,
+    "t": 156.05
+  },
+  {
+    "event": "my_move",
+    "move": "h6h7",
+    "from_px": [
+      1266,
+      393
+    ],
+    "to_px": [
+      1266,
+      305
+    ],
+    "think_ms": 250,
+    "t": 157.68
+  },
+  {
+    "event": "opponent_move",
+    "move": "e7g6",
+    "plies": 84,
+    "t": 158.73
+  },
+  {
+    "event": "my_move",
+    "move": "g5g6",
+    "from_px": [
+      1178,
+      481
+    ],
+    "to_px": [
+      1178,
+      393
+    ],
+    "think_ms": 250,
+    "t": 161.0
+  },
+  {
+    "event": "opponent_move",
+    "move": "f6e7",
+    "plies": 86,
+    "t": 162.18
+  },
+  {
+    "event": "my_move",
+    "move": "g6g8",
+    "from_px": [
+      1178,
+      393
+    ],
+    "to_px": [
+      1178,
+      217
+    ],
+    "think_ms": 250,
+    "t": 163.88
+  },
+  {
+    "event": "opponent_move",
+    "move": "d5d4",
+    "plies": 88,
+    "t": 164.98
+  },
+  {
+    "event": "my_move",
+    "move": "e3d4",
+    "from_px": [
+      1002,
+      657
+    ],
+    "to_px": [
+      915,
+      569
+    ],
+    "think_ms": 250,
+    "t": 166.9
+  },
+  {
+    "event": "opponent_move",
+    "move": "e7d7",
+    "plies": 90,
+    "t": 167.98
+  },
+  {
+    "event": "my_move",
+    "move": "g8d8",
+    "from_px": [
+      1178,
+      217
+    ],
+    "to_px": [
+      915,
+      217
+    ],
+    "think_ms": 250,
+    "t": 169.48
+  },
+  {
+    "event": "opponent_move",
+    "move": "d7d8",
+    "plies": 92,
+    "t": 170.65
+  },
+  {
+    "event": "my_move",
+    "move": "h7h8q",
+    "from_px": [
+      1266,
+      305
+    ],
+    "to_px": [
+      1266,
+      217
+    ],
+    "think_ms": 250,
+    "t": 173.96
+  },
+  {
+    "event": "opponent_move",
+    "move": "d8d7",
+    "plies": 94,
+    "t": 175.21
+  },
+  {
+    "event": "my_move",
+    "move": "e2e8",
+    "from_px": [
+      1002,
+      745
+    ],
+    "to_px": [
+      1002,
+      217
+    ],
+    "think_ms": 217,
+    "t": 176.61
+  },
+  {
+    "event": "opponent_move",
+    "move": "d7d6",
+    "plies": 96,
+    "t": 177.77
+  },
+  {
+    "event": "my_move",
+    "move": "h8e5",
+    "from_px": [
+      1266,
+      217
+    ],
+    "to_px": [
+      1002,
+      481
+    ],
+    "think_ms": 101,
+    "t": 179.23
+  },
+  {
+    "event": "final",
+    "local_fen": "4Q3/2r2p2/3k4/p3Q3/1p1P1P2/1P5P/P2P4/1R1K4 b - - 4 49",
+    "screen_fen": "4Q3/2r2p2/3k4/p3Q3/1p1P1P2/1P5P/P2P4/1R1K4 w - - 0 1",
+    "agrees": true,
+    "local_result": "1-0",
+    "t": 180.79
+  }
+]

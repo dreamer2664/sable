@@ -1,0 +1,24 @@
+{
+  "started": "2026-10-25T18:31:38Z",
+  "time_control": "3+0",
+  "rungs": [
+    {
+      "level": 8,
+      "games": [
+        {
+          "level": 8,
+          "game": 1,
+          "result": "0-1",
+          "moves": 48,
+          "plies": 48,
+          "elapsed_s": 120.7,
+          "sable_scored": false,
+          "book_lines_added": 0,
+          "final_fen": "r4rk1/pQ3pp1/2p4p/7P/2P3n1/N2pP3/PP1Pb3/1RB1Kq2 w - - 1 25",
+          "log": "/home/user/sable/tools/../results/g_L8_1.json"
+        }
+      ],
+      "wins_or_draws": 0
+    }
+  ]
+}

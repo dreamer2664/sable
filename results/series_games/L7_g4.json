@@ -1,0 +1,43 @@
+[
+  {
+    "event": "board_found",
+    "geo": [
+      607,
+      173,
+      1309,
+      876
+    ],
+    "t": 2.25
+  },
+  {
+    "event": "templates_cached",
+    "path": "/home/user/sable/tools/../results/templates.npz",
+    "t": 2.26
+  },
+  {
+    "event": "start_verified",
+    "flipped": false,
+    "t": 2.3
+  },
+  {
+    "event": "my_move",
+    "move": "e2e4",
+    "from_px": [
+      1002,
+      745
+    ],
+    "to_px": [
+      1002,
+      569
+    ],
+    "think_ms": 400,
+    "my_clock_left_ms": 178850,
+    "t": 4.11
+  },
+  {
+    "event": "opponent_move",
+    "move": "c7c5",
+    "plies": 2,
+    "t": 6.73
+  }
+]

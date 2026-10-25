@@ -1,0 +1,102 @@
+{
+  "square_accuracy": 1.0,
+  "exact_positions": "12/12",
+  "positions": [
+    {
+      "name": "start",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "exact": true,
+      "errors": [],
+      "read": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
+      "detected_flipped": false
+    },
+    {
+      "name": "open game",
+      "fen": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R w KQkq - 6 6",
+      "exact": true,
+      "errors": [],
+      "read": "r1bqk2r/pppp1ppp/2n2n2/2b1p3/2B1P3/2N2N2/PPPP1PPP/R1BQK2R",
+      "detected_flipped": false
+    },
+    {
+      "name": "queens off, dark sq",
+      "fen": "r3kb1r/pp1n1ppp/2p1pn2/q7/2BP4/2N1PN2/PP3PPP/R2QK2R w KQkq - 0 9",
+      "exact": true,
+      "errors": [],
+      "read": "r3kb1r/pp1n1ppp/2p1pn2/q7/2BP4/2N1PN2/PP3PPP/R2QK2R",
+      "detected_flipped": false
+    },
+    {
+      "name": "queen on dark g3",
+      "fen": "rnbqkb1r/pp1p1ppp/4pn2/2p5/P1P5/6Q1/1P1PPPPP/RNB1KBNR b KQkq - 1 4",
+      "exact": true,
+      "errors": [],
+      "read": "rnbqkb1r/pp1p1ppp/4pn2/2p5/P1P5/6Q1/1P1PPPPP/RNB1KBNR",
+      "detected_flipped": true
+    },
+    {
+      "name": "promoted pieces",
+      "fen": "4k3/8/8/8/8/8/8/QQQQKQQQ w - - 0 1",
+      "exact": true,
+      "errors": [],
+      "read": "4k3/8/8/8/8/8/8/QQQQKQQQ",
+      "detected_flipped": false
+    },
+    {
+      "name": "many knights",
+      "fen": "n1n1k1n1/8/8/8/8/8/8/N1N1K1N1 w - - 0 1",
+      "exact": true,
+      "errors": [],
+      "read": "n1n1k1n1/8/8/8/8/8/8/N1N1K1N1",
+      "detected_flipped": false
+    },
+    {
+      "name": "endgame kings",
+      "fen": "8/8/4k3/8/8/3K4/8/8 w - - 0 1",
+      "exact": true,
+      "errors": [],
+      "read": "8/8/4k3/8/8/3K4/8/8",
+      "detected_flipped": false
+    },
+    {
+      "name": "endgame pawns+d",
+      "fen": "8/5p2/4k3/8/8/2K2P2/8/8 w - - 0 1",
+      "exact": true,
+      "errors": [],
+      "read": "8/5p2/4k3/8/8/2K2P2/8/8",
+      "detected_flipped": false
+    },
+    {
+      "name": "dense middlegame",
+      "fen": "r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/R3KB1R w KQ - 3 8",
+      "exact": true,
+      "errors": [],
+      "read": "r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/R3KB1R",
+      "detected_flipped": false
+    },
+    {
+      "name": "black heavy",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1",
+      "exact": true,
+      "errors": [],
+      "read": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR",
+      "detected_flipped": true
+    },
+    {
+      "name": "all types dark",
+      "fen": "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR w - - 0 1",
+      "exact": true,
+      "errors": [],
+      "read": "rnbqkbnr/8/8/8/8/8/8/RNBQKBNR",
+      "detected_flipped": false
+    },
+    {
+      "name": "castled both",
+      "fen": "r4rk1/ppp2ppp/8/8/8/8/PPP2PPP/R4RK1 w - - 0 12",
+      "exact": true,
+      "errors": [],
+      "read": "r4rk1/ppp2ppp/8/8/8/8/PPP2PPP/R4RK1",
+      "detected_flipped": false
+    }
+  ]
+}

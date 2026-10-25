@@ -1,0 +1,30 @@
+{
+  "streak": 0,
+  "best_streak": 0,
+  "games": 1,
+  "history": [
+    {
+      "game": 1,
+      "result": "0-1",
+      "counted": false,
+      "agrees": true,
+      "moves": 66,
+      "elapsed_s": 139.0,
+      "streak_after": 0,
+      "fen": "1r2k3/p4p1p/2p5/3p4/6rb/4P3/PP3q2/2R2K2 w - - 2 34",
+      "learn": {
+        "book_lines_added": 0,
+        "mistakes_found": 1,
+        "avoid_lines_added": 1
+      },
+      "at": "2026-10-25T18:47:08Z"
+    }
+  ],
+  "target": 1,
+  "started": "2026-10-25T18:43:41Z",
+  "config": {
+    "level": 7,
+    "tc": "3+0",
+    "ms": 300
+  }
+}

@@ -823,6 +823,63 @@ static void ttStore(U64 key, int depth, Score score, int flag, uint32_t move) {
     e->score = (int16_t)max(-30000, min(30000, (int)score));
 }
 
+// ---------------------------------------------------------------- opening book
+// Learned from the engine's own wins. Deliberately simple: a plain text map from
+// position (board+side+castling+ep) to a move that has scored well for us. It
+// buys clock time in fast games, which matters more than it sounds in 1+0.
+static unordered_map<string, string> bookMoves;
+static unordered_set<string> avoidMoves;   // "key|uci" pairs learned from mistakes
+
+static void loadAvoid(const string &path) {
+    ifstream f(path);
+    if (!f) return;
+    string line;
+    while (getline(f, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        while (!line.empty() && (line.back() == '\r' || line.back() == ' ')) line.pop_back();
+        if (line.find('|') != string::npos) avoidMoves.insert(line);
+    }
+    if (!avoidMoves.empty())
+        fprintf(stderr, "info string avoid-list loaded: %zu entries\n", avoidMoves.size());
+}
+
+static string bookKey(const Pos &p) {
+    // board + side to move only: transposition-friendly and stable across games
+    string k;
+    k.reserve(70);
+    for (int r = 7; r >= 0; r--) {
+        int empty = 0;
+        for (int f = 0; f < 8; f++) {
+            int pc = p.board[r * 8 + f];
+            if (pc == EMPTY) { empty++; continue; }
+            if (empty) { k += char('0' + empty); empty = 0; }
+            const char *l = "pnbrqk";
+            char ch = l[pcType(pc)];
+            k += (pcColor(pc) == WHITE) ? toupper(ch) : ch;
+        }
+        if (empty) k += char('0' + empty);
+        if (r) k += '/';
+    }
+    k += (p.side == WHITE) ? " w" : " b";
+    return k;
+}
+
+static void loadBook(const string &path) {
+    ifstream f(path);
+    if (!f) return;
+    string line;
+    while (getline(f, line)) {
+        if (line.empty() || line[0] == '#') continue;
+        size_t bar = line.find('|');
+        if (bar == string::npos) continue;
+        string k = line.substr(0, bar), mv = line.substr(bar + 1);
+        while (!mv.empty() && (mv.back() == '\r' || mv.back() == ' ')) mv.pop_back();
+        if (!k.empty() && mv.size() >= 4) bookMoves[k] = mv;
+    }
+    if (!bookMoves.empty())
+        fprintf(stderr, "info string book loaded: %zu entries\n", bookMoves.size());
+}
+
 // ---------------------------------------------------------------- search
 struct SearchLimits {
     int depth = 128;
@@ -1089,13 +1146,27 @@ static void iterativeDeepening(Pos &p, const SearchLimits &lim, bool verbose) {
     MoveList root;
     uint32_t raw[256];
     int n = genMoves(p, raw);
+    // Learned avoid-list: drop moves that lost material in our own past games.
+    // Dropping them from the root list is safe; reordering them to the back is
+    // not. Demoting a move broke the aspiration-window/PVS assumptions at the
+    // root badly enough that vetoing 1.c4 produced 1.h4, so the move is removed
+    // outright instead -- unless that would leave nothing to play.
+    const string rootKey = bookKey(p);
+    vector<uint32_t> legalRoot;
     for (int i = 0; i < n; i++) {
         if (!make(p, raw[i])) continue;
         unmake(p, raw[i]);
-        root.add(raw[i], 0);
+        legalRoot.push_back(raw[i]);
+    }
+    for (uint32_t m : legalRoot) {
+        if (!avoidMoves.empty() && legalRoot.size() > 1 &&
+            avoidMoves.count(rootKey + "|" + moveToUci(m)))
+            continue;
+        root.add(m, 0);
     }
     if (root.n == 0) { bestRootMove = MV_NONE; return; }
     bestRootMove = root.m[0];
+    uint32_t stableBest = root.m[0];   // last move from a FULLY completed iteration
     bestRootScore = 0;
 
     int maxDepth = lim.depth;
@@ -1139,6 +1210,7 @@ static void iterativeDeepening(Pos &p, const SearchLimits &lim, bool verbose) {
         if (timeUp) break;
         prev = score;
         bestRootScore = score;
+        stableBest = bestRootMove;
         if (verbose) {
             auto now = chrono::steady_clock::now();
             int64_t ms = max<int64_t>(1, chrono::duration_cast<chrono::milliseconds>(now - startTime).count());
@@ -1158,6 +1230,11 @@ static void iterativeDeepening(Pos &p, const SearchLimits &lim, bool verbose) {
         if (hardDeadline > 0 && ms > hardDeadline * 55 / 100) break;
         if (abs(score) > SCORE_MATE - 200) break;
     }
+    // A half-finished iteration must never replace the answer. Its move has been
+    // searched with a null window and possibly cut off, so promoting it is how an
+    // engine lands on a move it did not actually choose -- vetoing 1.c4 under a
+    // 400ms limit produced 1.h4 for exactly this reason.
+    bestRootMove = stableBest;
 }
 
 // ---------------------------------------------------------------- UCI
@@ -1202,6 +1279,8 @@ int main(int argc, char **argv) {
     Pos pos;
     posFromFen(pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     ttInit(32);
+    loadBook("book.txt");
+    loadAvoid("avoid.txt");
     for (int i = 0; i < 128; i++) killers[i] = Killer();
     memset(historyTab, 0, sizeof(historyTab));
 
@@ -1267,6 +1346,20 @@ int main(int argc, char **argv) {
                 else if (tok == "nodes") ss >> lim.nodes;
                 else if (tok == "movestogo") ss >> lim.movestogo;
                 else if (tok == "infinite") lim.infinite = true;
+            }
+            // opening book first: instant, and it preserves clock in fast games
+            {
+                auto it = bookMoves.find(bookKey(pos));
+                if (it != bookMoves.end()) {
+                    uint32_t bm = uciToMove(pos, it->second);
+                    if (bm != MV_NONE && make(pos, bm)) {
+                        unmake(pos, bm);
+                        printf("info string book move\n");
+                        printf("bestmove %s\n", moveToUci(bm).c_str());
+                        fflush(stdout);
+                        continue;
+                    }
+                }
             }
             startTime = chrono::steady_clock::now();
             timeUp = false;

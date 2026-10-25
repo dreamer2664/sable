@@ -1,0 +1,104 @@
+[
+  {
+    "event": "board_found",
+    "geo": [
+      607,
+      173,
+      1309,
+      876
+    ],
+    "t": 1.64
+  },
+  {
+    "event": "start_verified",
+    "t": 1.69
+  },
+  {
+    "event": "my_move",
+    "move": "c2c4",
+    "from_px": [
+      827,
+      745
+    ],
+    "to_px": [
+      827,
+      569
+    ],
+    "think_ms": 220,
+    "t": 3.2
+  },
+  {
+    "event": "opponent_move",
+    "move": "g8f6",
+    "plies": 2,
+    "t": 5.54
+  },
+  {
+    "event": "my_move",
+    "move": "d1b3",
+    "from_px": [
+      915,
+      833
+    ],
+    "to_px": [
+      739,
+      657
+    ],
+    "think_ms": 220,
+    "t": 7.12
+  },
+  {
+    "event": "opponent_move",
+    "move": "e7e6",
+    "plies": 4,
+    "t": 7.93
+  },
+  {
+    "event": "my_move",
+    "move": "a2a4",
+    "from_px": [
+      651,
+      745
+    ],
+    "to_px": [
+      651,
+      569
+    ],
+    "think_ms": 220,
+    "t": 9.83
+  },
+  {
+    "event": "opponent_move",
+    "move": "c7c5",
+    "plies": 6,
+    "t": 12.46
+  },
+  {
+    "event": "my_move",
+    "move": "b3g3",
+    "from_px": [
+      739,
+      657
+    ],
+    "to_px": [
+      1178,
+      657
+    ],
+    "think_ms": 220,
+    "t": 14.12
+  },
+  {
+    "event": "unknown_opponent_move",
+    "read": "rnbqkb1r/pp1p1ppp/4pn2/2p5/P1P5/6q1/1P1PPPPP/RNB1KBNR",
+    "expected": "rnbqkb1r/pp1p1ppp/4pn2/2p5/P1P5/6Q1/1P1PPPPP/RNB1KBNR",
+    "t": 14.91
+  },
+  {
+    "event": "final",
+    "local_fen": "rnbqkb1r/pp1p1ppp/4pn2/2p5/P1P5/6Q1/1P1PPPPP/RNB1KBNR b KQkq - 1 4",
+    "screen_fen": "rnbqkb1r/pp1p1ppp/4pn2/2p5/P1P5/6q1/1P1PPPPP/RNB1KBNR w - - 0 1",
+    "agrees": false,
+    "local_result": "ongoing",
+    "t": 15.89
+  }
+]

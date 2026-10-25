@@ -1,0 +1,26 @@
+{
+  "level": 7,
+  "tc": "3+0",
+  "ms": 400,
+  "started": "2026-10-25T18:54:12Z",
+  "games": [
+    {
+      "game": 1,
+      "result": "unknown",
+      "won": false,
+      "counted": false,
+      "agrees": true,
+      "plies": 0,
+      "elapsed_s": 2.8,
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "learn": {
+        "book_lines_added": 0,
+        "mistakes_found": 0,
+        "avoid_lines_added": 0
+      },
+      "at": "2026-10-25T18:54:37Z"
+    }
+  ],
+  "wins": 0,
+  "played": 1
+}
