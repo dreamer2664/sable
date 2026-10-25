@@ -26,7 +26,7 @@ So this repo reports three things that are true instead of one that isn't:
 
 | Claim | Status | Where the evidence is |
 |---|---|---|
-| Draws Stockfish 17.1 at **full strength** in theoretically drawn positions | **proved, 7/7** | `results/hold_the_draw.json` |
+| Draws Stockfish 17.1 at **full strength** in theoretically drawn positions | **proved, 8/8** | `results/hold_the_draw.json` |
 | Beats Stockfish's full-strength *Skill Level 0–2* | **proved** | `results/ladder_skill*.json` |
 | Loses to Stockfish 17.1 at full strength from the start position | **stated plainly** | `results/ladder_skill20.json` |
 | Absolute strength ≈ **1850 Elo** (100 ms/move, 1 thread) | **measured with error bars** | `results/calib_elo*.json` |
@@ -34,8 +34,19 @@ So this repo reports three things that are true instead of one that isn't:
 The first row is the real version of "draws Stockfish max": in a *fortress*, the
 result does not depend on who is stronger. A correct defender holds it against
 God. `tools/hold_the_draw.py` proves Sable is a correct defender, and — this
-matters — it screens every position with Stockfish itself first, so a position
-that only *looks* drawn cannot be smuggled into the win column.
+matters — it does not take my word for which positions are drawn. Ground truth
+comes from the **lichess endgame tablebase**, which is exact, so a position that
+merely *looks* drawn cannot be smuggled into the win column.
+
+That gate has teeth. Three positions I was confident about were rejected by it:
+
+* a "Philidor" I transcribed by hand was **mate in 2 for the wrong side**;
+* a "blocked pawns dead draw" was a **forced win**;
+* an impossible FEN (a black king standing in check with White to move) **crashed
+  Stockfish outright** — impossible positions are not test cases, they are bugs
+  in the test.
+
+Only the eight tablebase-confirmed draws below were allowed to count.
 
 ---
 
@@ -69,29 +80,35 @@ Using Stockfish's own calibrated `UCI_Elo` scale as the yardstick:
 |---|---|---|
 | 1500 | 11/0/1 (0.917) | ≈ 1917 |
 | 1800 | 6/1/5 (0.542) | ≈ 1829 |
-| 2100 | see `results/calib_elo2100.json` | — |
 
 Two independent brackets agree to within ~90 points, which is about the
 precision 12-game matches can offer. **Call it ~1850 Elo at 100 ms/move**, and
-treat ±100 as the honest error bar.
+treat ±100 as the honest error bar. A third bracket at 2100 was started and
+deliberately abandoned: its games ran long enough that it stopped being worth
+the machine time, and the two brackets above already agree. That is noted here
+rather than quietly dropped.
 
 ### Holding the draw against Stockfish at full strength
 
 `python3 tools/hold_the_draw.py` — Sable defends, Stockfish 17.1 full strength
 attacks, outcome judged by the rules of chess:
 
-| Position | Result |
-|---|---|
-| Rook pawn, defender in front (a-file) | held |
-| Rook pawn, defender in front (h-file) | held |
-| Two knights cannot force mate | held |
-| Wrong-colour bishop fortress | held |
-| Philidor R+P vs R | held |
-| Blocked pawns | held |
-| Opposite bishops, dead position | held |
+| Position | Tablebase | Result | How it ended |
+|---|---|---|---|
+| Rook pawn, defender in front (a-file) | draw | **held** | insufficient material, 18 plies |
+| Rook pawn, defender in front (h-file) | draw | **held** | threefold repetition, 28 plies |
+| Two knights cannot force mate | draw | **held** | fifty-move rule, 99 plies |
+| Wrong-colour bishop fortress | draw | **held** | threefold repetition, 108 plies |
+| Opposite bishops, dead position | draw | **held** | threefold repetition, 19 plies |
+| **Philidor: R+P vs R** | draw | **held** | fifty-move rule, **137 plies** |
+| Knight vs knight | draw | **held** | fifty-move rule, 99 plies |
+| Bishop + wrong rook pawn | draw | **held** | insufficient material, 5 plies |
 
-Every one of those positions was first screened by Stockfish itself and only
-counted if Stockfish scored it as drawn. See `results/hold_the_draw.json`.
+Every position was confirmed `category: draw` by the lichess tablebase *before*
+being played, and every outcome was judged by the rules of chess. The Philidor
+line is the one that actually tests defence: 137 plies of Stockfish trying to
+build a Lucena position and Sable never allowing it. See
+`results/hold_the_draw.json`.
 
 ---
 
