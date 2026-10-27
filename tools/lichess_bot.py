@@ -34,10 +34,16 @@ import numpy as np
 from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-# overridable so a launcher can point at wherever pc-eye actually lives
+# pc-eye's repo does NOT ship an importable client (no pceye.py), so importing it
+# unconditionally made every tool in this directory unusable on a fresh machine --
+# including the tests, which need no screen at all. Try an installed module first,
+# then fall back to the client this repo carries; import never fails either way.
 PCEYE_DIR = os.environ.get("SABLE_PCEYE", os.path.join(HERE, "..", "..", "pceye"))
 sys.path.insert(0, PCEYE_DIR)
-import pceye  # noqa: E402  (the client written earlier)
+try:
+    import pceye  # noqa: E402
+except ImportError:                      # pragma: no cover - the normal case
+    import pceye_client as pceye  # noqa: E402
 
 def _engine_path():
     """Which engine drives the mouse. Overridable so the same harness can run
@@ -58,7 +64,11 @@ def _ensure_executable(path):
 
 SABLE = _engine_path()
 _ensure_executable(SABLE)
-SHOTS = os.path.join(HERE, "..", "results", "bot_shots")
+# Screenshots are evidence, and evidence belongs in results/ -- but a test run must
+# not write there. The tests were polluting results/bot_shots with synthetic frames,
+# which the geometry test then read back as real captured evidence and failed on.
+# SABLE_SHOTS_DIR points somewhere else (tests use a temp dir).
+SHOTS = os.environ.get("SABLE_SHOTS_DIR") or os.path.join(HERE, "..", "results", "bot_shots")
 os.makedirs(SHOTS, exist_ok=True)
 
 # ----------------------------------------------------------------- screen io
@@ -67,17 +77,57 @@ os.makedirs(SHOTS, exist_ok=True)
 _LAST = {}
 
 
+# ------------------------------------------------------------------ imports
+# Geometry and pixel features live in one place now. They had been copy-pasted
+# into three tools, so the same bug had to be fixed three times -- and was not.
+# Everything below keeps its old name, so other tools that import `B.find_board`
+# or `B.sq_patch` keep working unchanged.
+import boardvision as V  # noqa: E402
+from boardvision import (  # noqa: E402,F401
+    PATCH_N, SHAPES, sq_patch, square_box, square_centre, patch_features,
+)
+
+_CACHE = V.GeometryCache()
+
+
 def find_board_cached(im):
-    """Geometry only changes when the layout changes; reuse it, but re-validate."""
-    key = im.size
-    geo = _LAST.get(key)
-    if geo is not None:
-        L, T, R, B = geo["bbox"]
-        if R < im.size[0] and B < im.size[1]:
-            return geo
-    geo = find_board(im)
-    _LAST[key] = geo
-    return geo
+    """Board geometry for this screen layout, cached and re-validated.
+
+    Named as before, but it now costs ~0 ms instead of ~145 ms on a cache hit --
+    the geometry was being re-derived on every poll, for a value that only changes
+    when the window moves.
+    """
+    return _CACHE.get(im)
+
+
+def find_board(im):
+    """Locate the board. Raises instead of returning a plausible-looking guess."""
+    return V.find_board(im)
+
+
+def reset_geometry_cache():
+    """Forget the cached board box (call when the layout may have changed)."""
+    _CACHE.clear()
+
+
+def grab_region(geo, label="board", margin=0):
+    """Screenshot ONLY the board region.
+
+    The live loop asked for the full 1920x1080 frame every time (`?max=0`), which
+    is 123 KB per shot over the tunnel when 43 KB -- the board itself -- is all the
+    recogniser ever looks at. Measured on the recorded frames: 2.9x less traffic
+    per move, and the returned image IS the board, so no search is needed to find
+    it. `geo_from_crop` supplies the geometry for free.
+    """
+    region = V.board_region(geo, margin=margin)
+    hdrs, body, _ = pceye.req(f"/shot?max=0&region={region}")
+    if body[:2] != b"\xff\xd8":
+        raise RuntimeError("screen capture did not return a JPEG")
+    p = os.path.join(SHOTS, f"{int(time.time()*1000)}_{label}.jpg")
+    with open(p, "wb") as f:
+        f.write(body)
+    im = Image.open(p).convert("RGB")
+    return p, im, V.geo_from_crop(im)
 
 
 def grab_stable(label="stable", tries=8, tol=0.0005):
@@ -109,23 +159,28 @@ def grab(label="board"):
     return p, Image.open(p).convert("RGB")
 
 
+def act(payload):
+    """POST /act through whichever client is in use, raising instead of exiting.
+
+    `click()` used to post to pc-eye itself with urllib while everything else went
+    through the client module, so there were two HTTP paths to the same server and
+    the tests could only intercept one of them. One contract now: if the client
+    offers `act`, use it; else do the request here.
+    """
+    if hasattr(pceye, "act"):
+        return pceye.act(payload)
+    _, raw, _ = pceye.req("/act", "POST", payload)
+    return json.loads(raw)
+
+
 def click(x, y, settle=0.12):
     """Click a screen point, raising on failure instead of exiting.
 
-    pceye.req() calls sys.exit() on an HTTP error. Inside a live game that is
-    fatal: one out-of-range coordinate would terminate the bot and leave the
-    clock running. So this posts directly and raises a catchable error.
+    pceye.req() in the original client called sys.exit() on an HTTP error. Inside a
+    live game that is fatal: one out-of-range coordinate would terminate the bot
+    and leave the clock running.
     """
-    url, tok = pceye.load_creds()
-    body = json.dumps({"action": "click", "x": int(x), "y": int(y)}).encode()
-    req = urllib.request.Request(f"{url}/act?t={urllib.parse.quote(tok)}", data=body,
-                                 headers={"Content-Type": "application/json"}, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=60) as r:
-            d = json.loads(r.read())
-    except urllib.error.HTTPError as e:
-        detail = e.read()[:400].decode("utf-8", "replace")
-        raise RuntimeError(f"click rejected ({(int(x), int(y))}): HTTP {e.code} {detail}")
+    d = act({"action": "click", "x": int(x), "y": int(y)})
     if d.get("exact") is False:
         raise RuntimeError(f"click did not land: wanted {(x, y)} got {d.get('landed')}")
     if settle:
@@ -133,109 +188,21 @@ def click(x, y, settle=0.12):
     return d
 
 
-# ----------------------------------------------------------------- geometry
-
-def find_board(im):
-    """Locate the board. Raises instead of returning a plausible-looking guess."""
-    px = im.load()
-    W, H = im.size
-    from collections import Counter
-    c = Counter()
-    for y in range(0, H, 3):
-        for x in range(0, W, 3):
-            c[px[x, y]] += 1
-    cands = []
-    for col, _ in c.most_common(60):
-        if 6 <= max(col) - min(col) and 60 <= sum(col) / 3 <= 235:
-            if all(sum(abs(col[i] - o[i]) for i in range(3)) > 40 for o in cands):
-                cands.append(col)
-        if len(cands) == 2:
-            break
-    if len(cands) < 2:
-        raise RuntimeError("no board colours on screen")
-    A, B = cands
-
-    def isboard(x, y):
-        p = px[x, y]
-        for col in (A, B):
-            if abs(p[0] - col[0]) < 24 and abs(p[1] - col[1]) < 24 and abs(p[2] - col[2]) < 24:
-                return True
-        return False
-
-    cell = 16
-    minx, miny, maxx, maxy = W, H, -1, -1
-    for y0 in range(0, H, cell):
-        for x0 in range(0, W, cell):
-            tot = hit = 0
-            for y in range(y0, min(y0 + cell, H), 4):
-                for x in range(x0, min(x0 + cell, W), 4):
-                    tot += 1
-                    if isboard(x, y):
-                        hit += 1
-            if tot and hit / tot > 0.9:
-                minx, miny = min(minx, x0), min(miny, y0)
-                maxx, maxy = max(maxx, min(x0 + cell, W)), max(maxy, min(y0 + cell, H))
-    if maxx < 0:
-        raise RuntimeError("no board region found")
-
-    def frac_x(x, y0, y1):
-        n = h = 0
-        for y in range(y0, y1, 2):
-            n += 1
-            if isboard(x, y):
-                h += 1
-        return h / max(n, 1)
-
-    def frac_y(y, x0, x1):
-        n = h = 0
-        for x in range(x0, x1, 2):
-            n += 1
-            if isboard(x, y):
-                h += 1
-        return h / max(n, 1)
-
-    L = R = T = Bo = None
-    for x in range(minx - cell, minx + 2 * cell):
-        if 0 <= x < W and frac_x(x, miny + 20, maxy - 20) > 0.97:
-            L = x; break
-    for x in range(maxx + cell, maxx - 2 * cell, -1):
-        if 0 <= x < W and frac_x(x, miny + 20, maxy - 20) > 0.97:
-            R = x; break
-    for y in range(miny - cell, miny + 2 * cell):
-        if 0 <= y < H and frac_y(y, minx + 20, maxx - 20) > 0.97:
-            T = y; break
-    for y in range(maxy + cell, maxy - 2 * cell, -1):
-        if 0 <= y < H and frac_y(y, minx + 20, maxx - 20) > 0.97:
-            Bo = y; break
-    if None in (L, R, T, Bo):
-        raise RuntimeError("could not refine board edges")
-    bw, bh = R - L + 1, Bo - T + 1
-    sx, sy = bw / 8.0, bh / 8.0
-    if abs(sx - sy) > 1.5 or not (30 <= sx <= 220):
-        raise RuntimeError(f"board geometry rejected: {bw}x{bh} -> {sx:.1f}x{sy:.1f}")
-    return {"bbox": [L, T, R, Bo], "sq": sx}
+def key(combo, settle=0.0):
+    d = act({"action": "key", "key": str(combo)})
+    if settle:
+        time.sleep(settle)
+    return d
 
 
-def square_box(geo, file_idx, rank_idx, flipped=False):
-    """Pixel box of a square. rank_idx 0 = rank 1."""
-    L, T, R, B = geo["bbox"]
-    if flipped:
-        file_idx, rank_idx = 7 - file_idx, 7 - rank_idx
-    sx = (R - L + 1) / 8.0
-    sy = (B - T + 1) / 8.0
-    x0 = int(round(L + file_idx * sx))
-    y0 = int(round(B + 1 - (rank_idx + 1) * sy))
-    return (x0, y0, int(round(x0 + sx)), int(round(y0 + sy)))
-
-
-def square_centre(geo, file_idx, rank_idx, flipped=False):
-    x0, y0, x1, y1 = square_box(geo, file_idx, rank_idx, flipped)
-    return ((x0 + x1) // 2, (y0 + y1) // 2)
+def paste(text, settle=0.0):
+    d = act({"action": "paste", "text": text})
+    if settle:
+        time.sleep(settle)
+    return d
 
 
 # ----------------------------------------------------------------- recognition
-
-PATCH_N = 32
 
 # ---------------------------------------------------------------------------
 # Recognition, v2.
@@ -255,86 +222,9 @@ PATCH_N = 32
 # code works on light and dark squares and on a themed board.
 # ---------------------------------------------------------------------------
 
-SHAPES = ["P", "N", "B", "R", "Q", "K"]
-
-
-def sq_patch(im, geo, f, r, flipped, n=PATCH_N, inset=0.14):
-    """Centre crop of a square.
-
-    The inset is not cosmetic. lichess draws coordinate labels (a-h, 1-8) inside
-    the edge of the border squares, and those dark glyphs were being counted as
-    piece pixels -- which flipped white bishops, queens and rooks on rank 1 to
-    "black" and made the bot lose games to a misread, not to Stockfish. Sampling
-    the middle 72% keeps the piece (always centred) and drops the labels.
-    """
-    x0, y0, x1, y1 = square_box(geo, f, r, flipped)
-    dx, dy = int((x1 - x0) * inset), int((y1 - y0) * inset)
-    return im.crop((x0 + dx, y0 + dy, x1 - dx, y1 - dy)).resize((n, n), Image.LANCZOS)
-
-
-def patch_features(p):
-    """Return (shape mask, fill fraction, is_white, stats).
-
-    Colour is decided by COUNTING strongly-bright and strongly-dark pixels
-    against the square's own background, not by comparing medians or means.
-    Both of those were measured and both were unreliable: the mean is dragged
-    down by a white piece's dark outline, and the median can land mid-grey on a
-    dark square. Counting is unambiguous --
-
-        white piece : a large bright population (its fill) + a thin dark outline
-        black piece : a large dark population, nothing brighter than the square
-
-    and it holds on light and dark squares alike, because everything is measured
-    against that square's own background rather than an absolute threshold.
-    """
-    a = np.asarray(p, dtype=np.float32)
-    h, w, _ = a.shape
-    luma = a @ np.array([0.299, 0.587, 0.114], dtype=np.float32)
-    k = max(2, w // 8)
-    corners = np.concatenate([
-        luma[:k, :k].ravel(), luma[:k, -k:].ravel(),
-        luma[-k:, :k].ravel(), luma[-k:, -k:].ravel()])
-    bg = float(np.median(corners))
-    bright = luma > bg + 22.0
-    dark = luma < bg - 45.0
-    mask = (bright | dark)
-    fill = float(mask.mean())
-
-    # Colour: look INSIDE the glyph, not at all of it.
-    # Every lichess piece is drawn as a fill inside a dark outline. Counting
-    # bright vs dark pixels over the whole glyph therefore fails for the pieces
-    # whose outlines and internal detail are thick -- rook, bishop, queen -- even
-    # though they are plainly white. (Measured: 87% square accuracy, and the bot
-    # lost a live game to it.) Eroding the mask throws the outline away, and the
-    # remaining interior is simply the piece's fill colour.
-    interior = mask
-    for _ in range(2):
-        interior = (interior & np.roll(interior, 1, 0) & np.roll(interior, -1, 0)
-                    & np.roll(interior, 1, 1) & np.roll(interior, -1, 1))
-    if interior.sum() >= 8:
-        zone = interior
-    elif mask.sum() > 0:
-        zone = mask
-    else:
-        zone = None
-    if zone is None:
-        fill_luma = bg
-        is_white = False
-    else:
-        inner_bright = int((luma[zone] > bg + 25.0).sum())
-        inner_dark = int((luma[zone] < bg - 45.0).sum())
-        fill_luma = float(np.median(luma[zone]))
-        # Measured on a real board: black pieces have a fill luma of ~2-3, white
-        # pieces ~250, and the white queen -- whose interior is part fill, part
-        # crown detail -- sits at ~152 against a background of 219. Comparing the
-        # fill to the background (rather than to a count of bright pixels) puts
-        # every one of those on the correct side with a wide margin.
-        is_white = bool(fill_luma > bg * 0.6)
-    stats = {"bg": round(bg, 1), "bright": int(bright.sum()), "dark": int(dark.sum()),
-             "fill_luma": round(fill_luma, 1),
-             "inner_bright": int((luma[zone] > bg + 25.0).sum()) if zone is not None else 0,
-             "inner_dark": int((luma[zone] < bg - 45.0).sum()) if zone is not None else 0}
-    return mask.astype(np.float32), fill, is_white, stats
+# sq_patch / patch_features / square_box / square_centre / PATCH_N / SHAPES are
+# imported from boardvision at the top of this file (see "imports"). They were
+# defined here and duplicated in two other tools.
 
 
 class Recogniser:
@@ -587,22 +477,45 @@ def _stockfish_best(fen, ms):
 
 
 def sable_best(fen, ms=300):
-    # cwd matters: the engine loads book.txt / avoid.txt from the directory it is
-    # started in. Pin it to the engine's own folder so learned lines are always
-    # found, however the bot was launched.
+    """Best move from the configured engine, over a PERSISTENT process.
+
+    This used to spawn `./sable`, feed it one move and `quit`, every single move.
+    Measured on a 200 ms search: 578 ms wall clock, of which 390 ms was process
+    start, book load, a fresh 32 MB transposition table and teardown. In a 1+0
+    game -- 60 seconds, ~30 of our moves -- that is ~12 seconds spent starting a
+    program that already knows the position. Reusing one process removes the
+    overhead and, because the hash and everything learned about the position
+    survive between moves, it is also a little stronger.
+
+    The old path is kept for engines that misbehave over a pipe, and for the
+    reference-engine case (Stockfish), which needs a real UCI handshake because it
+    treats a queued `quit` as a stop and returns a depth-1 move.
+    """
     eng = _engine_path()
-    if _is_stockfish(eng):
-        return _stockfish_best(fen, ms)
-    _ensure_executable(eng)
-    pre = os.environ.get("SABLE_SETOPTIONS", "")
-    uci = (pre + "\n" if pre else "") + f"position fen {fen}\ngo movetime {ms}\nquit\n"
-    p = subprocess.run([eng], input=uci,
-                       capture_output=True, text=True, timeout=30,
-                       cwd=os.path.dirname(os.path.abspath(eng)))
-    for line in p.stdout.splitlines():
-        if line.startswith("bestmove"):
-            return line.split()[1]
-    raise RuntimeError("engine gave no move")
+    opts = _parse_setoptions(os.environ.get("SABLE_SETOPTIONS", ""))
+    key = (os.path.abspath(eng), tuple(sorted(opts.items())))
+    e = _engine_cache.get(key)
+    if e is None:
+        _ensure_executable(eng)
+        if not os.access(eng, os.X_OK) and not _is_stockfish(eng):
+            raise RuntimeError(f"engine {eng} is not executable")
+        e = _UciEngine(eng, opts)
+        _engine_cache[key] = e
+    try:
+        return e.best(fen, ms)
+    except Exception:
+        # a wedged engine must not poison every later move
+        try:
+            e.close()
+        except Exception:
+            pass
+        _engine_cache.pop(key, None)
+        raise
+
+
+def reset_engines():
+    """Close every cached engine process (tests, and between games)."""
+    _quit_engines()
 
 
 # ----------------------------------------------------------------- play
@@ -700,6 +613,28 @@ def play_move(board, move, geo, flipped, verify=True, rec=None, label="mv"):
         f"{chess.square_name(move.to_square)} did not settle after 4 attempts")
 
 
+def move_landed(expected_board, seen):
+    """Did our move reach the board, given what is on the screen now?
+
+    Comparing board_fen() exactly is wrong: a level-6 computer can answer in
+    50-1000 ms, so by the time the verification screenshot is read the position may
+    already contain the opponent's reply -- and treating that as "our move did not
+    land" would click the same move a second time. So a position is accepted when
+    it is either exactly the expected one, or reachable from it by one legal
+    opponent move. Anything else is a genuine failure.
+    """
+    if seen is None:
+        return False, "unreadable"
+    if seen.board_fen() == expected_board.board_fen():
+        return True, "landed"
+    for m in expected_board.legal_moves:
+        probe = expected_board.copy()
+        probe.push(m)
+        if probe.board_fen() == seen.board_fen():
+            return True, "landed_then_answered"
+    return False, "not_landed"
+
+
 def detect_opponent_move(prev_board, board_now):
     """Which legal move turns prev_board into board_now? Uses the piece placement."""
     cands = []
@@ -720,15 +655,53 @@ def wait_for_board(timeout=40):
         try:
             path, im = grab("wait")
             geo = find_board(im)
+            reset_geometry_cache()
+            _CACHE.set(im, geo)
             return path, im, geo
         except Exception:
             time.sleep(0.4)
-    raise RuntimeError("no board appeared on screen")
+    raise RuntimeError(f"no board appeared on screen within {timeout:.0f}s")
+
+
+POLL_FIRST_S = 0.10          # first re-read delay after our move
+POLL_GROWTH = 1.45           # each unchanged frame waits this much longer
+POLL_MAX_S = 1.20
+STALL_RESYNC_AT = (6, 14)    # same schedule as before: resync, do not abandon
+STALL_GIVE_UP = 18
 
 
 def play_game(side=chess.WHITE, engine_ms=200, max_seconds=120, log_path=None,
-              board_timeout=40.0, record_dir=None, resume=False, clock_ms=None):
-    """Play one game against whatever is on screen. Returns a dict of evidence."""
+              board_timeout=40.0, record_dir=None, resume=False, clock_ms=None,
+              use_region=True, verify_own_moves=True, min_confidence=V.DEFAULT_MIN_CONFIDENCE):
+    """Play one game against whatever is on screen. Returns a dict of evidence.
+
+    What changed from the version this replaces, and why it is faster:
+
+      * GEOMETRY IS CACHED and, during play, not searched for at all: screenshots
+        are requested for the board region only (2.9x fewer bytes) and the
+        returned image *is* the board. ~145 ms -> 0 ms per frame.
+      * THE ENGINE IS PERSISTENT, so a move no longer costs ~390 ms of process
+        start-up and loses its transposition table between moves.
+      * THE POLL NO LONGER SLEEPS 0.55 s BEFORE EVERY LOOK. It reads, and if the
+        frame has not changed waits a little longer next time. Typical games now
+        spend their time waiting for the opponent, not for the harness.
+
+    and why it is more correct:
+
+      * EVERY READ PASSES A GATE before it is believed (`read_plausible`: king
+        counts, per-square template confidence, and a position that chess allows).
+        A failed read triggers one full-frame re-locate and re-read instead of
+        being adopted.
+      * OUR OWN MOVE IS VERIFIED. The board used to be updated optimistically --
+        a click that missed was only discovered several plies later, which is what
+        the "final resync=4..6" lines in the old logs were. Now the position is
+        re-read after each of our moves and a mismatch is retried once, then
+        reported.
+      * TEMPLATES ARE LEARNED IN THE RIGHT ORIENTATION. They were always learned
+        with `flipped=False` regardless of the side being played, so a game as
+        Black (lichess flips the board) would learn every piece against the wrong
+        square.
+    """
     log = []
 
     def note(**kw):
@@ -739,67 +712,161 @@ def play_game(side=chess.WHITE, engine_ms=200, max_seconds=120, log_path=None,
                 json.dump(log, f, indent=2)
 
     t_start = time.time()
-    path, im, geo = wait_for_board()
-    note(event="board_found", geo=[round(v) for v in geo["bbox"]])
+    path, im, geo = wait_for_board(board_timeout)
+    note(event="board_found", geo=[round(v) for v in geo["bbox"]],
+         method=geo.get("method"), find_ms=geo.get("ms"))
 
-    TPL = os.path.join(HERE, "..", "results", "templates.npz")
+    TPL = os.environ.get("SABLE_TEMPLATES") or os.path.join(HERE, "..", "results", "templates.npz")
     rec = Recogniser()
+
+    def read_checked(label, expect_side=None, retry_full=True):
+        """Read the board, and believe it only if it passes the gate.
+
+        Returns (board, reason, full_geo). On a failed read from a region crop the
+        crop is abandoned and the frame is re-located at full size once, because
+        the usual cause is that the window moved or the page scrolled.
+        """
+        nonlocal geo
+        src = label
+        if use_region:
+            try:
+                _, shot, _ = grab_region(geo, src)
+                board, reason = V.read_plausible(rec, shot, V.geo_from_crop(shot),
+                                                 flipped, side=expect_side,
+                                                 min_confidence=min_confidence)
+                if board is not None:
+                    return board, reason, geo
+            except Exception as e:
+                reason = f"region read failed: {e}"
+            else:
+                reason = reason or "region read rejected"
+        else:
+            reason = "region disabled"
+        if not retry_full:
+            return None, reason, geo
+        _, shot = grab(f"{label}_full")
+        try:
+            geo = find_board(shot)
+            _CACHE.set(shot, geo)
+        except Exception as e:
+            return None, f"{reason}; re-locate failed: {e}", geo
+        board, reason2 = V.read_plausible(rec, shot, geo, flipped, side=expect_side,
+                                          min_confidence=min_confidence)
+        return board, reason2, geo
+
     if resume:
         # Templates must come from a position we know. They describe how lichess
         # DRAWS a piece, not where it is, so one cached set works for every board
-        # in the session. (Learning them from an unknown mid-game board is
-        # circular and produced garbage.)
+        # in the session.
         if not rec.load(TPL):
             raise RuntimeError("no cached templates; start a game normally once so they can be learned")
-        flipped, read, _ = read_auto(rec, im, geo)
-        board = read
-        board.turn = side
-        note(event="resumed", fen=board.board_fen(), flipped=flipped)
-        # Is it actually my move? Give the opponent three seconds to move; if the
-        # position is unchanged after that, the move is mine.
+        # Lichess orients the board from the player's side; if that guess is wrong
+        # the read fails the gate, so try the other orientation before giving up.
+        flipped = (side == chess.BLACK)
+        board, reason, geo = read_checked("resume")
+        if board is None:
+            flipped = not flipped
+            board, reason, geo = read_checked("resume_flipped")
+        if board is None:
+            raise RuntimeError(f"cannot read the resumed position: {reason}")
+        note(event="resumed", fen=board.board_fen(), flipped=flipped, read=reason)
+        # Is it actually my move? Give the opponent three seconds; if the position
+        # is unchanged after that, the move is mine.
         time.sleep(3.0)
-        _, im2 = grab("resumecheck")
-        geo2 = find_board_cached(im2)
-        now2, _ = rec.read(im2, geo2, flipped)
-        if now2.board_fen() != board.board_fen():
+        now, reason, geo = read_checked("resumecheck")
+        if now is not None and now.board_fen() != board.board_fen():
             for m in list(board.legal_moves):
-                probe = board.copy(); probe.push(m)
-                if probe.board_fen() == now2.board_fen():
+                probe = board.copy()
+                probe.push(m)
+                if probe.board_fen() == now.board_fen():
                     board = probe
                     break
             note(event="opponent_moved_first", fen=board.board_fen())
         my_turn = True
     else:
-        rec.learn(im, geo, chess.Board(), False)
-        rec.save(TPL)
-        note(event="templates_cached", path=TPL)
-        flipped, read, _ = read_auto(rec, im, geo)
-        if read.board_fen() != chess.Board().board_fen():
-            raise RuntimeError(f"game did not start from the normal position: {read.board_fen()}")
-        note(event="start_verified", flipped=flipped)
-        board = chess.Board()
-        my_turn = (board.turn == side)
+        # Lichess orients the board so the player's own pieces are at the bottom.
+        flipped = (side == chess.BLACK)
+        # Prefer a template set that is ALREADY KNOWN to work, and never overwrite
+        # it blindly. `learn()` keeps ONE template per shape, taken from the first
+        # square that shape occupies in a1..h8 order, so a fresh learn on a board
+        # where that square is awkward -- a coordinate label, a last-move
+        # highlight, a piece mid-animation -- poisons every later read in the
+        # session, and the good set it replaced is gone. So: load the cache, prove
+        # it by reading the start position, and re-learn only if it fails.
+        start_fen = chess.Board().board_fen()
+        reused = False
+        had_templates = rec.load(TPL)
+        if had_templates:
+            probe, why = V.read_plausible(rec, im, geo, flipped, side=side,
+                                          min_confidence=min_confidence)
+            if probe is not None and probe.board_fen() == start_fen:
+                reused = True
+                note(event="templates_reused", path=TPL, note=why)
+            else:
+                note(event="templates_rejected", path=TPL,
+                     reason=(why or "read did not match the start position"))
+        if not reused and not had_templates:
+            # Nothing cached: this is the only chance to learn. It is safe only
+            # because the frame has to be the opening position for the labelling
+            # (piece -> square) to be correct.
+            rec.learn(im, geo, chess.Board(), flipped)
+            rec.save(TPL)
+            note(event="templates_cached", path=TPL, learned_flipped=flipped)
+        elif not reused:
+            # Cached templates exist but did not read this frame as the opening
+            # position. That is expected when the opponent has already moved, and
+            # it is NOT a reason to learn again: learning labels pieces by start-
+            # position squares, so doing it on a mid-game board writes six
+            # mislabelled templates over a good set and every later read in the
+            # session degrades. Keep the good set and adopt the position instead.
+            note(event="templates_kept", path=TPL,
+                 why="cached set does not show the opening position; assuming the "
+                     "opponent has already moved, keeping the templates")
+
+        # Does the board still show the opening position? As White it always does.
+        # As BLACK it often does not: lichess starts White's clock the moment the
+        # game is created, so by the first screenshot White may already have moved.
+        # Requiring the start position then aborted every game as Black before the
+        # first move. Adopt whatever is on the board instead, exactly as `resume`
+        # does, and let the normal opponent-move detection take it from there.
+        read, reason = V.read_plausible(rec, im, geo, flipped, side=side,
+                                        min_confidence=min_confidence)
+        if read is not None and read.board_fen() == chess.Board().board_fen():
+            note(event="start_verified", flipped=flipped)
+            board = chess.Board()
+            my_turn = (board.turn == side)
+        else:
+            flipped_alt = not flipped
+            alt, alt_reason = V.read_plausible(rec, im, geo, flipped_alt, side=side,
+                                                min_confidence=min_confidence)
+            if read is None and alt is not None:
+                read, reason, flipped = alt, alt_reason, flipped_alt
+            if read is None:
+                raise RuntimeError(f"cannot read the opening position: {reason}")
+            board = read
+            board.turn = chess.Board().turn if read.board_fen() == chess.Board().board_fen() else side
+            note(event="start_adopted", flipped=flipped, fen=board.board_fen(),
+                 turn=("white" if board.turn else "black"), reason=reason)
+            my_turn = (board.turn == side)
+            if not my_turn:
+                note(event="opponent_moves_first", fen=board.board_fen())
+
     stalls = 0
     # Our OWN clock, not the wall clock. Counting the opponent's thinking against
     # us made the harness abandon games with most of our time still on the board.
     my_spent_ms = 0.0
-    MOVE_OVERHEAD_MS = 750   # measured cost of click + verify + screenshot
 
     while time.time() - t_start < max_seconds:
         # ---- my move
         if my_turn and not board.is_game_over():
-            # Clock pacing. The harness itself costs ~0.4-0.8s per move in
-            # screenshots and clicks, so the engine's thinking time has to leave
-            # room for it. Losing on time is a loss like any other (it happened
-            # at level 4, with the board still defensible), so the budget is
-            # derived from the real clock, not from a fixed delay.
             elapsed_ms = (time.time() - t_start) * 1000
             if clock_ms:
                 clock_left = max(0.0, clock_ms - my_spent_ms)
                 # Only stop when OUR clock is nearly gone, keeping enough time to
                 # land one more move.
                 if clock_left < 4000:
-                    note(event="low_clock_stop", left_ms=round(clock_left)); break
+                    note(event="low_clock_stop", left_ms=round(clock_left))
+                    break
                 think = int(max(60, min(engine_ms, clock_left / 26.0)))
             else:
                 remaining = max_seconds - (time.time() - t_start)
@@ -808,21 +875,55 @@ def play_game(side=chess.WHITE, engine_ms=200, max_seconds=120, log_path=None,
             try:
                 uci = sable_best(board.fen(), think)
             except Exception as e:
-                note(event="engine_error", err=str(e)); break
+                note(event="engine_error", err=str(e))
+                break
             mv = chess.Move.from_uci(uci)
             if mv not in board.legal_moves:
-                note(event="illegal_engine_move", move=uci); break
+                note(event="illegal_engine_move", move=uci)
+                break
             try:
                 a, b = play_move(board, mv, geo, flipped, rec=rec, label=f'ply{board.ply()}')
             except Exception as e:
-                note(event="click_failed", move=uci, err=str(e)); break
+                note(event="click_failed", move=uci, err=str(e))
+                break
             board.push(mv)
-            # charge what the turn ACTUALLY cost, not an estimate: clicking and
-            # verifying is the dominant term and it varies with the position
+            note(event="my_move", move=uci, from_px=list(a), to_px=list(b), think_ms=think)
+
+            # Verify the move actually landed on the board. A promotion is skipped
+            # because play_move has already proved settlement for it, and the
+            # picker overlay would make an independent read meaningless.
+            if verify_own_moves and not mv.promotion:
+                seen, reason, geo = read_checked(f"verify{board.ply()}")
+                ok, why = move_landed(board, seen)
+                if seen is None:
+                    note(event="own_move_unverified", move=uci, reason=reason)
+                elif not ok:
+                    note(event="own_move_not_landed", move=uci,
+                         expected=board.board_fen(), screen=seen.board_fen())
+                    retry_board = board.copy()
+                    retry_board.pop()
+                    try:
+                        play_move(retry_board, mv, geo, flipped, rec=rec,
+                                  label=f'retry{board.ply()}')
+                    except Exception as e:
+                        note(event="click_retry_failed", move=uci, err=str(e))
+                        my_turn = False
+                        continue
+                    seen, reason, geo = read_checked(f"reverify{board.ply()}")
+                    ok, why = move_landed(board, seen)
+                    if not ok:
+                        note(event="own_move_still_not_landed", move=uci, reason=reason)
+                        if seen is not None and seen.is_valid():
+                            board = seen          # adopt reality rather than drift
+                        my_turn = False
+                        continue
+                    note(event="own_move_landed_on_retry", move=uci)
+                else:
+                    note(event="own_move_verified", move=uci, how=why)
             my_spent_ms += (time.time() - turn_started) * 1000.0
-            note(event="my_move", move=uci, from_px=list(a), to_px=list(b), think_ms=think,
-                 my_clock_left_ms=round(clock_ms - my_spent_ms) if clock_ms else None)
-            time.sleep(0.10)
+            note(event="clock_used", my_clock_left_ms=round(clock_ms - my_spent_ms) if clock_ms else None,
+                 spent_ms=round(my_spent_ms))
+            time.sleep(0.05)
             my_turn = False
             stalls = 0
             continue
@@ -831,58 +932,54 @@ def play_game(side=chess.WHITE, engine_ms=200, max_seconds=120, log_path=None,
         # corresponds to EXACTLY ONE legal move.
         #
         # A single read is not enough: lichess animates the moving piece, so a
-        # poll can land mid-flight and see a bishop part-way between f8 and d6,
-        # which reads as garbage. That is precisely how the first 10+0 attempt
-        # died -- the board said "p" where a bishop belonged, no legal move
-        # matched, and the bot gave up. So: retry the read a few times before
-        # concluding anything, and only ever act on an unambiguous match.
-        cands = []
+        # poll can land mid-flight. The retry loop stays, but it no longer begins
+        # with a fixed 0.55 s sleep -- the first read happens immediately and the
+        # wait between reads grows only while the frame is unchanged.
         stalls += 1
-        time.sleep(0.55)          # the computer moves in 50-1000ms; wait once, don't spin
+        delay = min(POLL_MAX_S, POLL_FIRST_S * (POLL_GROWTH ** max(0, stalls - 1)))
+        time.sleep(delay)
+        cands = []
+        now = None
         for attempt in range(2):
-            try:
-                path, im = grab("poll")
-                geo = find_board_cached(im)
-                now, _ = rec.read(im, geo, flipped)
-            except Exception as e:
-                note(event="read_failed", err=str(e))
-                time.sleep(0.1)
+            seen, reason, geo = read_checked(f"poll{board.ply()}_{attempt}")
+            if seen is None:
+                note(event="read_failed", err=reason)
+                time.sleep(0.08)
                 continue
-            if now.board_fen() == board.board_fen():
+            now = seen
+            if seen.board_fen() == board.board_fen():
                 break                                  # still my opponent's turn
-            got = detect_opponent_move(board, now)
+            got = detect_opponent_move(board, seen)
             if len(got) >= 1:
                 cands = got
                 break
-            time.sleep(0.10)                           # probably mid-animation
+            time.sleep(0.08)                           # probably mid-animation
         if not cands:
             if board.is_game_over(claim_draw=True):
                 break
-            if stalls in (6, 14):
-                # Resync instead of dying. If the local board has drifted from the
-                # real one (a click that missed, a piece misread, a move lichess
-                # never registered), abandoning the game is the worst option: the
-                # clock keeps running for the player either way. Adopt the board as
-                # it actually stands and carry on.
-                try:
-                    _, imr = grab("resync")
-                    geor = find_board_cached(imr)
-                    real, _ = rec.read(imr, geor, flipped)
-                    if real.is_valid() and len(real.pieces(chess.KING, side)) == 1:
-                        real.turn = side
-                        lf = [m.uci() for m in board.move_stack]
-                        note(event="resynced", was=board.board_fen(), now=real.board_fen(),
-                             diverge_plies=len(lf))
-                        board = real
+            if stalls in STALL_RESYNC_AT:
+                note(event="resync_attempt", stalls=stalls,
+                     read=(now.board_fen() if now is not None else None))
+                if now is not None and now.is_valid() and len(now.pieces(chess.KING, side)) == 1:
+                    if now.board_fen() == board.board_fen():
+                        # Nothing actually changed: the opponent is simply still
+                        # thinking. Claiming the turn here -- which the previous
+                        # loop did -- makes the bot play out of turn, the move is
+                        # refused, the position never advances, and the game is
+                        # lost on the clock while it repeats the same move.
+                        note(event="resync_no_change", stalls=stalls)
+                    else:
+                        now.turn = side
+                        note(event="resynced", was=board.board_fen(), now=now.board_fen(),
+                             diverge_plies=len(board.move_stack))
+                        board = now
                         my_turn = True
                         stalls = 0
                         continue
-                except Exception as e:
-                    note(event="resync_failed", err=str(e))
-            if stalls > 18:                            # ~10s and still nothing
-                note(event="no_progress", stalls=stalls, last_read=now.board_fen())
+            if stalls > STALL_GIVE_UP:
+                note(event="no_progress", stalls=stalls,
+                     last_read=now.board_fen() if now is not None else None)
                 break
-            time.sleep(0.04)
             continue
         board.push(cands[0])
         note(event="opponent_move", move=cands[0].uci(), plies=board.ply())
@@ -893,16 +990,27 @@ def play_game(side=chess.WHITE, engine_ms=200, max_seconds=120, log_path=None,
 
     # ---- final evidence
     try:
-        path, im = grab("final")
-        geo = find_board_cached(im)
-        final_read, _ = rec.read(im, geo, flipped)
+        final_read, reason, geo = read_checked("final", retry_full=True)
+        if final_read is None:
+            _, shot = grab("final")
+            final_read, _ = rec.read(shot, find_board_cached(shot), flipped)
+            note(event="final_read_gate_failed", reason=reason)
+        # `agrees` must tolerate the opponent's reply being in flight. The final
+        # screenshot is taken while the game may still be moving; comparing the
+        # board_fen exactly marks a perfectly-tracked game as disagreeing the
+        # moment the computer answers before the read lands. That mattered: three
+        # drivers count a win only when `agrees is not False`, so an in-flight reply
+        # could discard a legitimate win. Exact agreement is recorded separately.
+        exact = (final_read.board_fen() == board.board_fen())
+        tolerant = exact or move_landed(board, final_read)[0]
         note(event="final", local_fen=board.fen(), screen_fen=final_read.fen(),
-             agrees=(final_read.board_fen() == board.board_fen()),
+             agrees=tolerant, agrees_exact=exact,
              local_result=board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "ongoing")
         if record_dir:
             os.makedirs(record_dir, exist_ok=True)
+            _, shot = grab("final_record")
             with open(os.path.join(record_dir, "final_screen.jpg"), "wb") as f:
-                im.save(f, "JPEG", quality=90)
+                shot.save(f, "JPEG", quality=90)
     except Exception as e:
         note(event="final_read_failed", err=str(e))
     return {"log": log, "final_board": board, "elapsed_s": round(time.time() - t_start, 1)}

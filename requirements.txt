@@ -1,0 +1,4 @@
+# sable's Python tooling. The engine itself (src/sable.cpp) has no dependencies.
+python-chess>=1.9
+numpy>=1.24
+pillow>=9.2
