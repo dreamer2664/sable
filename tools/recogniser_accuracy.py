@@ -21,11 +21,15 @@ from PIL import Image
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
-sys.path.insert(0, os.path.join(HERE, "..", "..", "pceye"))
-import lichess_bot as B  # noqa: E402
+import lichess_bot as B          # noqa: E402
+import pceye_client as pceye     # noqa: E402
+import boardvision as V          # noqa: E402
 
-PCEYE = os.path.join(HERE, "..", "..", "pceye", "pceye.py")
-SCALE = 1920 / 1568.0
+# The analysis page is clicked in the coordinates of a 1568px-wide render, and the
+# screen is 1920 wide. That factor used to be a bare constant with no explanation;
+# it is a property of the browser window this was measured on. Override it with
+# SABLE_RENDER_SCALE when the window is a different size rather than editing code.
+SCALE = float(os.environ.get("SABLE_RENDER_SCALE", 1920 / 1568.0))
 
 # A FEN box click in rendered-preview coordinates (the analysis page layout).
 FEN_BOX_RENDERED = (800, 760)
@@ -47,19 +51,24 @@ POSITIONS = [
 
 
 def click_native(x, y):
-    subprocess.run([sys.executable, PCEYE, "click", str(int(x)), str(int(y)), "--nosettle"],
-                   capture_output=True, text=True)
+    pceye.click(int(x), int(y))
 
 
 def set_fen(fen):
+    """Type a position into the analysis board's FEN box.
+
+    This used to shell out to `../../pceye/pceye.py`, a file the pc-eye repo does
+    not contain, so the whole measurement could not run. It goes through the same
+    client the bot uses now.
+    """
     rx, ry = FEN_BOX_RENDERED
     click_native(rx * SCALE, ry * SCALE)
     time.sleep(0.25)
-    subprocess.run([sys.executable, PCEYE, "key", "ctrl+a", "--nosettle"], capture_output=True)
+    pceye.key("ctrl+a")
     time.sleep(0.12)
-    subprocess.run([sys.executable, PCEYE, "paste", fen, "--nosettle"], capture_output=True)
+    pceye.paste(fen)
     time.sleep(0.25)
-    subprocess.run([sys.executable, PCEYE, "key", "enter"], capture_output=True)
+    pceye.key("enter")
     time.sleep(2.2)
 
 

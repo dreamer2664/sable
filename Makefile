@@ -22,10 +22,16 @@ exec-bits:
 deps:
 	$(PY) -m pip install -q -r requirements.txt
 
-test: $(TARGET) exec-bits
+# Fail with one clear sentence instead of six "ModuleNotFoundError: chess" errors
+# from inside the suite. python-chess is a pip install and is easy to lose.
+check-deps:
+	@$(PY) -c "import chess, numpy, PIL" 2>/dev/null || \
+	  { echo "missing Python deps (chess/numpy/pillow). Run: make deps"; exit 1; }
+
+test: $(TARGET) exec-bits check-deps
 	$(PY) -m unittest discover -s tests -p 'test_*.py' -v
 
-test-engine: $(TARGET) exec-bits
+test-engine: $(TARGET) exec-bits check-deps
 	./tests/perft.sh
 	$(PY) tools/uci_test.py
 
@@ -35,4 +41,4 @@ perft: $(TARGET) exec-bits
 clean:
 	rm -f $(TARGET)
 
-.PHONY: all native test test-engine perft exec-bits deps clean
+.PHONY: all native test test-engine perft exec-bits deps check-deps clean
