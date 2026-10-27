@@ -864,6 +864,47 @@ static string bookKey(const Pos &p) {
     return k;
 }
 
+// Where do book.txt / avoid.txt live? They used to be opened relative to the
+// CURRENT DIRECTORY, so `./sable` from the repo root loaded the book and the same
+// binary run from anywhere else silently played bookless -- different openings,
+// different results, same command line. Resolve relative paths against the
+// executable's own directory instead, and let an env var override.
+static string exeDir() {
+#ifdef __linux__
+    char buf[4096];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof(buf) - 1);
+    if (n > 0) {
+        buf[n] = 0;
+        string p(buf);
+        size_t slash = p.find_last_of('/');
+        if (slash != string::npos) return p.substr(0, slash);
+    }
+#endif
+    return string(".");
+}
+
+static bool fileExists(const string &p) { ifstream f(p); return (bool)f; }
+
+static string resolveDataFile(const string &path, const char *envVar, const string &fallbackName) {
+    if (const char *e = getenv(envVar)) {
+        if (*e) return string(e);
+    }
+    if (path.empty()) return exeDir() + "/" + fallbackName;
+    if (path[0] == '/') return path;
+    // Relative: prefer the one next to the binary, then the source-ish layout the
+    // harness uses (tools/../book.txt is the repo root), then the cwd.
+    vector<string> cands = {
+        exeDir() + "/" + path,
+        exeDir() + "/../" + path,
+        exeDir() + "/../../" + path,
+        path,
+    };
+    for (auto &c : cands) if (fileExists(c)) return c;
+    return exeDir() + "/" + path;
+}
+
+static bool bookEnabled = true;
+
 static void loadBook(const string &path) {
     ifstream f(path);
     if (!f) return;
@@ -1279,8 +1320,9 @@ int main(int argc, char **argv) {
     Pos pos;
     posFromFen(pos, "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1");
     ttInit(32);
-    loadBook("book.txt");
-    loadAvoid("avoid.txt");
+    if (getenv("SABLE_NO_BOOK")) bookEnabled = false;
+    if (bookEnabled) loadBook(resolveDataFile("book.txt", "SABLE_BOOK", "book.txt"));
+    loadAvoid(resolveDataFile("avoid.txt", "SABLE_AVOID", "avoid.txt"));
     for (int i = 0; i < 128; i++) killers[i] = Killer();
     memset(historyTab, 0, sizeof(historyTab));
 
@@ -1295,6 +1337,8 @@ int main(int argc, char **argv) {
             printf("id author formalcode\n");
             printf("option name Hash type spin default 32 min 1 max 1024\n");
             printf("option name Threads type spin default 1 min 1 max 1\n");
+            printf("option name Book type check default true\n");
+            printf("option name BookFile type string default book.txt\n");
             printf("uciok\n");
             fflush(stdout);
         } else if (cmd == "isready") {
@@ -1306,6 +1350,13 @@ int main(int argc, char **argv) {
             while (ss >> b && b != "value") name += (name.empty() ? "" : " ") + b;
             if (b == "value") { while (ss >> b) value += (value.empty() ? "" : " ") + b; }
             if (name == "Hash") ttInit((size_t)max(1, atoi(value.c_str())));
+            else if (name == "Book") {
+                bookEnabled = !(value == "false" || value == "0");
+                fprintf(stderr, "info string book %s\n", bookEnabled ? "on" : "off");
+            } else if (name == "BookFile") {
+                bookMoves.clear();
+                loadBook(resolveDataFile(value, "SABLE_BOOK", "book.txt"));
+            }
         } else if (cmd == "ucinewgame") {
             ttClear();
             memset(historyTab, 0, sizeof(historyTab));
@@ -1347,8 +1398,10 @@ int main(int argc, char **argv) {
                 else if (tok == "movestogo") ss >> lim.movestogo;
                 else if (tok == "infinite") lim.infinite = true;
             }
-            // opening book first: instant, and it preserves clock in fast games
-            {
+            // Opening book first: instant, and it preserves clock in fast games.
+            // Not during `go infinite` (analysis must actually search) and not when
+            // the book has been switched off.
+            if (bookEnabled && !lim.infinite) {
                 auto it = bookMoves.find(bookKey(pos));
                 if (it != bookMoves.end()) {
                     uint32_t bm = uciToMove(pos, it->second);

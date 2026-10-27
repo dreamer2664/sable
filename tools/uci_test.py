@@ -121,15 +121,47 @@ for label, fen in [("startpos", chess.STARTING_FEN),
           bad or f"{plies} plies, result {b.result() if b.is_game_over() else 'ongoing'}, {time.time()-t0:.1f}s")
 
 # ---------------------------------------------------------------- time management
+# Out of book, or these measure nothing: from the start position the book answers
+# in 0ms and every movetime "passes" without the search running at all.
+MID = chess.Board("r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/R3KB1R w KQ - 3 8")
 for ms, tol in [(100, 1200), (300, 1500), (1000, 4000)]:
-    b = chess.Board(); e.setpos(b)
-    t = time.time(); e.go(movetime=ms); el = (time.time() - t) * 1000
+    e.send("ucinewgame"); e.setpos(MID)
+    t = time.time(); mv, info = e.go(movetime=ms); el = (time.time() - t) * 1000
     check(f"movetime {ms}ms respected", el <= tol, f"took {el:.0f}ms")
+    check(f"movetime {ms}ms actually searched", el >= ms * 0.5,
+          f"took {el:.0f}ms of {ms}ms asked")
 
 # ---------------------------------------------------------------- clock-based allocation
+# From the OPENING POSITION the book may answer instantly, which is correct and is
+# what used to fail this check ("used 0ms of 5000ms"). Two separate contracts:
+#   * a book move must be legal and announced as such;
+#   * a clock allocation must actually use the clock when there is no book move.
 b = chess.Board(); e.setpos(b)
-t = time.time(); e.go(wtime=5000, btime=5000, winc=100, binc=100); el = (time.time() - t) * 1000
-check("clock allocation sane (5s+0.1)", 20 <= el <= 2000, f"used {el:.0f}ms of 5000ms")
+t = time.time(); mv, info = e.go(wtime=5000, btime=5000, winc=100, binc=100)
+el = (time.time() - t) * 1000
+from_book = any("book move" in l for l in info)
+check("opening move is legal", chess.Move.from_uci(mv) in b.legal_moves, mv)
+check("book move is announced as a book move", from_book or el >= 20,
+      f"used {el:.0f}ms, book={from_book}")
+
+bookless = chess.Board("r1bq1rk1/pp2ppbp/2np1np1/8/3NP3/2N1BP2/PPPQ2PP/R3KB1R w KQ - 3 8")
+e.send("ucinewgame"); e.setpos(bookless)
+t = time.time(); mv2, info2 = e.go(wtime=5000, btime=5000, winc=100, binc=100)
+el2 = (time.time() - t) * 1000
+check("clock allocation sane (5s+0.1, no book move)", 20 <= el2 <= 2000,
+      f"used {el2:.0f}ms of 5000ms")
+check("no book move out of book", not any("book move" in l for l in info2), mv2)
+
+# The book must be switchable off, or it cannot be measured at all: an engine that
+# always answers from memory cannot be benchmarked against its own search.
+e2 = Engine()
+e2.send("setoption name Book value false")
+e2.send("isready"); e2.wait("readyok")
+e2.send("ucinewgame"); e2.setpos(chess.Board())
+t = time.time(); mv3, info3 = e2.go(movetime=250); el3 = (time.time() - t) * 1000
+check("Book option off: the opening is searched, not remembered",
+      not any("book move" in l for l in info3), f"{mv3} in {el3:.0f}ms")
+e2.quit()
 
 # ---------------------------------------------------------------- determinism
 b = chess.Board("r1bqkbnr/pppp1ppp/2n5/4p3/2B1P3/5N2/PPPP1PPP/RNBQK2R b KQkq - 3 3")

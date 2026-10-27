@@ -257,22 +257,22 @@ def append_to_history(rec):
         json.dump(hist, f, indent=2)
 
 
-def add_book_lines(moves, plies=12):
-    """Store the first `plies` moves of a game we scored in, for instant replay."""
-    board = chess.Board()
-    lines = []
-    for i, uci in enumerate(moves[:plies]):
-        keyside = " ".join(board.fen().split()[:2])
-        lines.append(f"{keyside}|{uci}")
-        board.push(chess.Move.from_uci(uci))
-    existing = set()
-    if os.path.exists(BOOK):
-        existing = {l.strip() for l in open(BOOK) if l.strip()}
-    new = [l for l in lines if l not in existing]
-    if new:
-        with open(BOOK, "a") as f:
-            f.write("\n".join(new) + "\n")
-    return len(new)
+def add_book_lines(moves, plies=12, sable_white=None):
+    """Store the opening of a game we scored in -- via learn.add_book, not a copy.
+
+    This function used to be a second implementation of the same idea, and the two
+    drifted: this one wrote the OPPONENT's moves as well (which the engine can
+    never look up, because it only consults the book when it is to move), skipped
+    the legality check, and had no quality gate at all. Delegating means there is
+    one rule about what earns a place in the book.
+    """
+    try:
+        import learn as LEARN
+        r = LEARN.add_book(moves, plies=plies, sable_white=sable_white)
+        return r["added"]
+    except Exception as e:
+        print(f"  !! book learning failed: {e}")
+        return 0
 
 
 def play_rung(level, ms, max_seconds, timeouts=(3, 2), side="white"):
@@ -293,9 +293,11 @@ def play_rung(level, ms, max_seconds, timeouts=(3, 2), side="white"):
         board = r["final_board"]
         result = board.result(claim_draw=True) if board.is_game_over(claim_draw=True) else "ongoing"
         moves = [m.uci() for m in board.move_stack]
-        scored = result == "1-0" and side == "white" or result == "0-1" and side == "black"
+        scored = ((result == "1-0" and side == "white") or
+                  (result == "0-1" and side == "black"))
         drew = result == "1/2-1/2"
-        added = add_book_lines(moves) if (scored or drew) else 0
+        added = (add_book_lines(moves, sable_white=(side == "white"))
+                 if (scored or drew) else 0)
         rec = {"level": level, "game": gi + 1, "result": result, "moves": len(moves),
                "plies": board.ply(), "elapsed_s": r["elapsed_s"],
                "sable_scored": scored or drew, "book_lines_added": added,
