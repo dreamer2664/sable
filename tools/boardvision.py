@@ -97,6 +97,26 @@ def board_colours(a, tol_spread=6, luma=(60, 235), merge=40):
     return cands if len(cands) == 2 else None
 
 
+def dim_gain(cols, target=218.0, floor=110.0, cap=2.4):
+    """How much to brighten a frame whose square colours are too dark.
+
+    lichess dims the whole page behind a modal -- the promotion picker, the
+    game-over dialog, the "are you sure" box. The dimmed squares still form a
+    clean checkerboard, so the board is perfectly locatable; what changes is that
+    the two square colours no longer look like board colours, and a dark UI panel
+    can outrank them in the frequency ranking. On the real frame that started
+    this, the palette came out as (96,88,72)/(80,64,56) instead of
+    (238,218,185)/(174,138,106) and the detector refused a board that was right
+    there on screen.
+
+    Returns 1.0 for a normal frame.
+    """
+    m = float(np.mean([float(np.mean(c)) for c in cols]))
+    if m >= floor:
+        return 1.0
+    return min(cap, target / max(m, 20.0))
+
+
 def colour_mask(a, cols, tol=24):
     """Boolean mask of pixels matching either square colour."""
     m = np.zeros(a.shape[:2], dtype=bool)
@@ -170,12 +190,20 @@ def find_board(im, scale=SCALE, pad=PAD, frac=EDGE_FRAC):
     cols = board_colours(a_s)
     if cols is None:
         raise RuntimeError("no board colours on screen")
+    gain = dim_gain(cols)
+    if gain > 1.0:                    # page is dimmed behind a modal
+        a_s = np.clip(a_s * gain, 0, 255).astype(np.int16)
+        cols = board_colours(a_s)
+        if cols is None:
+            raise RuntimeError("no board colours on screen, even undimmed")
     cs = coarse_box(colour_mask(a_s, cols), cell=max(2, 16 // scale))
     if cs is None:
         raise RuntimeError("no board region found")
     cL, cT, cR, cB = (v * scale for v in cs)      # coarse, full-res, +-16px
 
     a = np.asarray(im, dtype=np.int16)
+    if gain > 1.0:
+        a = np.clip(a * gain, 0, 255).astype(np.int16)
 
     def strip_edges(y0, y1, x0, x1, axis, inward):
         y0, y1 = max(0, min(H, y0)), max(0, min(H, y1))
@@ -216,7 +244,7 @@ def find_board(im, scale=SCALE, pad=PAD, frac=EDGE_FRAC):
             raise RuntimeError(f"board geometry rejected: {R - L}x{B - T} px "
                                f"(a square would be {(R - L) / 8:.1f}x{(B - T) / 8:.1f})")
     return {"bbox": [int(L), int(T), int(R) - 1, int(B) - 1],
-            "sq": (R - L) / 8.0, "method": method,
+            "sq": (R - L) / 8.0, "method": method, "dim": round(gain, 3),
             "ms": round((time.perf_counter() - t0) * 1000, 1)}
 
 
@@ -354,6 +382,7 @@ class GeometryCache:
 
     def __init__(self):
         self._geo = {}
+        self.last = None            # most recent good geometry, any image size
 
     def get(self, im, validate=False, scale=SCALE):
         key = im.size
@@ -374,9 +403,11 @@ class GeometryCache:
         return geo
 
     def set(self, im, geo):
+        self.last = geo
         self._geo[im.size] = geo
 
     def clear(self):
+        self.last = None
         self._geo.clear()
 
 
@@ -429,6 +460,51 @@ def read_board(rec, im, geo, flipped, empty_threshold=0.03):
         board.set_piece_at(sq, piece)
         detail[sq] = (piece.symbol(), margin)
     return board, detail
+
+
+def mean_confidence(detail):
+    """Mean per-square template margin, the same number the read gate uses."""
+    if isinstance(detail, dict):
+        vals = [v[1] for v in detail.values()]
+        return sum(vals) / max(len(vals), 1)
+    return float(detail)
+
+
+def calibrate_offset(rec, im, geo, flipped, truth=None, max_shift=1, min_gain=0.008):
+    """Nudge the board box by up to a pixel so the squares line up with the grid.
+
+    The edge refinement is accurate to 1px, and on a real frame one pixel is
+    enough to change a read: shifting the measured box by a single pixel turned
+    one square wrong and dropped mean confidence from 0.864 to 0.807. The pixel
+    itself cannot be found by looking at edges -- both candidates look like an
+    edge -- but the CONTENT can tell: template distance is minimised when the
+    crop sits on the glyph's own centre. So try the 3x3 neighbourhood, score each
+    by mean confidence, and keep the best one only if it is genuinely better.
+
+    `truth` (a known board, e.g. the opening position at the start of a game)
+    makes this exact: an offset that reads `truth` correctly wins outright.
+
+    Cost: 9 reads, ~170 ms, once per game or resync -- not per move.
+    """
+    L, T, R, B = geo["bbox"]
+    best = None
+    for dx in range(-max_shift, max_shift + 1):
+        for dy in range(-max_shift, max_shift + 1):
+            g = dict(geo)
+            g["bbox"] = [L + dx, T + dy, R + dx, B + dy]
+            board, detail = read_board(rec, im, g, flipped)
+            conf = mean_confidence(detail)
+            exact = bool(truth is not None and board.board_fen() == truth.board_fen())
+            score = (1 if exact else 0, conf)
+            if best is None or score > best[0]:
+                best = (score, dx, dy, g, conf)
+    score, dx, dy, g, conf = best
+    # Refuse a "better" offset that is only noise.
+    if (dx or dy) and conf - mean_confidence(read_board(rec, im, geo, flipped)[1]) < min_gain:
+        return dict(geo), {"dx": 0, "dy": 0, "conf": round(conf, 3), "kept": "original"}
+    g["offset"] = [dx, dy]
+    return g, {"dx": dx, "dy": dy, "conf": round(conf, 3),
+               "exact": bool(truth is not None and score[0]), "kept": "shifted" if (dx or dy) else "original"}
 
 
 def read_plausible(rec, im, geo, flipped, side=None, min_confidence=DEFAULT_MIN_CONFIDENCE):

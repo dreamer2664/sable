@@ -284,5 +284,117 @@ class TestCache(unittest.TestCase):
         self.assertEqual(cache._geo, {})
 
 
+class TestDimmedFrames(unittest.TestCase):
+    """A modal dims the page. Geometry must not lie about it, and the loop must
+    survive it by reusing the last good geometry."""
+
+    def test_gain_is_one_on_a_normal_frame(self):
+        frames = poll_frames()
+        if not frames:
+            self.skipTest("no fixtures")
+        im = load(frames[0])
+        a_s = np.asarray(im.reduce(V.SCALE), dtype=np.int16)
+        cols = V.board_colours(a_s)
+        self.assertIsNotNone(cols)
+        self.assertEqual(V.dim_gain(cols), 1.0)
+
+    def test_gain_detects_a_dimmed_page(self):
+        frames = poll_frames()
+        if not frames:
+            self.skipTest("no fixtures")
+        im = load(frames[0])
+        dimmed = Image.eval(im, lambda v: int(v * 0.40))
+        a_s = np.asarray(dimmed.reduce(V.SCALE), dtype=np.int16)
+        cols = V.board_colours(a_s)
+        self.assertIsNotNone(cols, "a dimmed page should still show a checkerboard")
+        self.assertGreater(V.dim_gain(cols), 1.5)
+
+    def test_a_modal_frame_is_never_given_a_wrong_box(self):
+        # The two promotion frames shipped in results/ are the real thing: lichess
+        # dims everything behind the picker. Either the board is located sanely or
+        # the detector refuses -- it must never return a box that is not 8x8.
+        found = refused = 0
+        for p in sorted(glob.glob(os.path.join(SHOTS, "*promo*.jpg"))):
+            im = load(p)
+            try:
+                geo = V.find_board(im)
+            except RuntimeError:
+                refused += 1
+                continue
+            L, T, R, B = geo["bbox"]
+            w, h = R - L + 1, B - T + 1
+            self.assertLessEqual(abs(w / 8.0 - h / 8.0), V.SQUARENESS_TOL,
+                                 f"{p}: accepted a box that is not an 8x8 grid")
+            found += 1
+        if not found and not refused:
+            self.skipTest("no promotion fixtures")
+        self.assertGreater(found + refused, 0)
+
+    def test_cache_remembers_the_last_good_geometry(self):
+        cache = V.GeometryCache()
+        frames = poll_frames()
+        if not frames:
+            self.skipTest("no fixtures")
+        im = load(frames[0])
+        geo = V.find_board(im)
+        cache.set(im, geo)
+        self.assertEqual(cache.last["bbox"], geo["bbox"])
+        cache.clear()
+        self.assertIsNone(cache.last)
+
+
+class TestOffsetCalibration(unittest.TestCase):
+    """One pixel of geometry error is enough to change a read, so the 1px
+    ambiguity has to be resolved against content, not edges."""
+
+    def setUp(self):
+        sys.path.insert(0, os.path.join(ROOT, "tools"))
+        import lichess_bot as B
+        self.rec = B.Recogniser()
+        if not self.rec.load(os.path.join(ROOT, "results", "templates.npz")):
+            self.skipTest("no templates")
+
+    def _start_frame(self):
+        # Must be the OPENING position: calibration is scored against it. The
+        # poll frames are mid-game, so they cannot be used here.
+        p = os.path.join(SHOTS, "1792954475704_wait.jpg")
+        if not os.path.exists(p):
+            self.skipTest("no start-position fixture")
+        return load(p)
+
+    def test_calibration_repairs_a_deliberate_one_pixel_error(self):
+        import chess
+        im = self._start_frame()
+        geo = V.find_board(im)
+        L, T, R, B = geo["bbox"]
+        off = dict(geo, bbox=[L + 1, T - 1, R + 1, B - 1])
+        g2, info = V.calibrate_offset(self.rec, im, off, False, truth=chess.Board())
+        self.assertTrue(info["exact"], "calibration did not recover an exact read")
+        # More than one 1px-shifted box can read the opening correctly, so the
+        # contract is "still on the true grid, within a pixel" -- not "identical
+        # to whatever find_board happened to return".
+        for a, b in zip(g2["bbox"], geo["bbox"]):
+            self.assertLessEqual(abs(a - b), 1, f"{g2['bbox']} drifted from {geo['bbox']}")
+
+    def test_calibration_leaves_a_good_geometry_exact(self):
+        import chess
+        im = self._start_frame()
+        geo = V.find_board(im)
+        g2, info = V.calibrate_offset(self.rec, im, geo, False, truth=chess.Board())
+        board, _ = V.read_board(self.rec, im, g2, False)
+        self.assertEqual(board.board_fen(), chess.Board().board_fen())
+        self.assertLessEqual(abs(info["dx"]), 1)
+        self.assertLessEqual(abs(info["dy"]), 1)
+
+    def test_calibration_does_not_drift_on_noise(self):
+        # A frame that is already aligned must not be moved just because some
+        # neighbour scores a thousandth higher.
+        im = self._start_frame()
+        geo = V.find_board(im)
+        g2, info = V.calibrate_offset(self.rec, im, geo, False, truth=None)
+        self.assertIn(info["dx"], (-1, 0, 1))
+        self.assertEqual(len(g2["bbox"]), 4)
+
+
 if __name__ == "__main__":
     unittest.main(verbosity=2)

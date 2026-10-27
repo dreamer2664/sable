@@ -187,6 +187,7 @@ class VirtualScreen:
         else:
             board_img = np.array(self._background, dtype=np.float32)
         half = SPRITE // 2
+        bl, bt = L, T                        # board_img is board-local; the page adds the offset
         for r in range(8):
             for f in range(8):
                 sq = chess.square(f, r)
@@ -199,6 +200,10 @@ class VirtualScreen:
                 if sprite is None:
                     continue
                 fc, rk = (f, r) if self.our_side != chess.BLACK else (7 - f, 7 - r)
+                # Clear the whole square first, so nothing of the previous occupant
+                # survives underneath the new glyph.
+                x0, y0, x1, y1 = V_SQUARE_BOX(geo, fc, rk)
+                board_img[y0:y1, x0:x1] = np.array(square_colour(fc, rk), dtype=np.float32)
                 bg_src = self.sprites.get(sym + "@bg", sprite[0, 0]).astype(np.float32)
                 bg_dst = np.array(square_colour(fc, rk), dtype=np.float32)
                 patch = sprite.astype(np.float32)
@@ -207,9 +212,23 @@ class VirtualScreen:
                     delta = np.abs(patch - bg_src).max(axis=2)
                     a = np.clip(delta / 110.0, 0.0, 1.0)[:, :, None]
                     patch = patch + (1.0 - a) * (bg_dst[None, None, :] - bg_src[None, None, :])
-                x0, y0, x1, y1 = V_SQUARE_BOX(geo, fc, rk)
-                h, w = min(SPRITE, y1 - y0), min(SPRITE, x1 - x0)
-                board_img[y0:y0 + h, x0:x0 + w] = np.clip(patch[:h, :w], 0, 255)
+                # Paste CENTRED on the same fractional grid the sprite was cut from,
+                # not at the square's corner box. The board's 703px width does not
+                # divide by 8 (87.875 px per square), so corner boxes alternate 87
+                # and 88 px and a corner-anchored 88px paste lands up to a pixel off
+                # what lichess drew. One pixel was enough to read a white rook on h4
+                # as a PAWN (template distance 0.201 for P against 0.225 for R),
+                # which is exactly the kind of false confident read the loop has to
+                # be protected from -- so the fixture must not manufacture it.
+                cx, cy = _square_centre(fc, rk)
+                px, py = int(round(cx - bl - half)), int(round(cy - bt - half))
+                h, w = patch.shape[0], patch.shape[1]
+                bh, bw = board_img.shape[0], board_img.shape[1]
+                sx0, sy0 = max(0, px), max(0, py)
+                sx1, sy1 = min(bw, px + w), min(bh, py + h)
+                if sx1 > sx0 and sy1 > sy0:
+                    board_img[sy0:sy1, sx0:sx1] = np.clip(
+                        patch[sy0 - py:sy1 - py, sx0 - px:sx1 - px], 0, 255)
         # Use the REAL screenshot as the page around the board. The board detector
         # refines its edges against whatever surrounds the board, so a synthetic
         # flat page made it report the board one pixel narrower than the real frame

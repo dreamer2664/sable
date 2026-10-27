@@ -714,7 +714,7 @@ def play_game(side=chess.WHITE, engine_ms=200, max_seconds=120, log_path=None,
     t_start = time.time()
     path, im, geo = wait_for_board(board_timeout)
     note(event="board_found", geo=[round(v) for v in geo["bbox"]],
-         method=geo.get("method"), find_ms=geo.get("ms"))
+         method=geo.get("method"), find_ms=geo.get("ms"), dim=geo.get("dim"))
 
     TPL = os.environ.get("SABLE_TEMPLATES") or os.path.join(HERE, "..", "results", "templates.npz")
     rec = Recogniser()
@@ -749,7 +749,21 @@ def play_game(side=chess.WHITE, engine_ms=200, max_seconds=120, log_path=None,
             geo = find_board(shot)
             _CACHE.set(shot, geo)
         except Exception as e:
-            return None, f"{reason}; re-locate failed: {e}", geo
+            # Re-locating failed. That is expected while a modal is up: lichess
+            # dims the whole page behind the promotion picker and a dialog, and a
+            # dimmed frame is genuinely not locatable by colour (measured: the
+            # dark squares come out 33 in the blue channel away from any single
+            # brightness correction, so no gain factor recovers both colours).
+            # The board has not moved, so fall back to the last good geometry and
+            # let the plausibility gate decide whether the read is worth having.
+            if _CACHE.last is None:
+                return None, f"{reason}; re-locate failed: {e}", geo
+            geo = _CACHE.last
+            note(event="geometry_reused", why=str(e)[:80])
+            board, reason2 = V.read_plausible(rec, shot, geo, flipped,
+                                              side=expect_side,
+                                              min_confidence=min_confidence)
+            return board, reason2, geo
         board, reason2 = V.read_plausible(rec, shot, geo, flipped, side=expect_side,
                                           min_confidence=min_confidence)
         return board, reason2, geo
@@ -796,6 +810,15 @@ def play_game(side=chess.WHITE, engine_ms=200, max_seconds=120, log_path=None,
         start_fen = chess.Board().board_fen()
         reused = False
         had_templates = rec.load(TPL)
+        if had_templates:
+            # Edge refinement is accurate to 1px, and one pixel measurably changes
+            # reads (a single pixel off turned one square wrong and moved mean
+            # confidence 0.864 -> 0.807). Resolve that ambiguity against the one
+            # position we always know: the opening. Costs 9 reads once.
+            geo, cal = V.calibrate_offset(rec, im, geo, flipped, truth=chess.Board())
+            if cal["dx"] or cal["dy"]:
+                _CACHE.set(im, geo)
+            note(event="geometry_calibrated", **cal)
         if had_templates:
             probe, why = V.read_plausible(rec, im, geo, flipped, side=side,
                                           min_confidence=min_confidence)
